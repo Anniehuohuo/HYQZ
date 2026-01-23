@@ -60,6 +60,8 @@ Route::group(function () {
     //远程注册用户
     Route::get('remote_register', 'v1.LoginController/remoteRegister')->option(['real_name' => '远程注册用户']);
 
+    Route::post('ai/chat', 'v1.ai.AiController/chat')->option(['real_name' => 'AI对话']);
+
 })->middleware(\app\http\middleware\AllowOriginMiddleware::class)
     ->middleware(\app\api\middleware\StationOpenMiddleware::class)
     ->option(['mark' => 'base', 'mark_name' => '基础接口']);

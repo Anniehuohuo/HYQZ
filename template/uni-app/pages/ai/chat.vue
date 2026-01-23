@@ -55,6 +55,9 @@
 
 <script>
 	import colors from '@/mixins/color.js'
+	import {
+		aiChat
+	} from '@/api/ai.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
 
 	function uid() {
@@ -73,6 +76,7 @@
 				showBar: false,
 				agentId: '',
 				title: '',
+				conversationId: '',
 				draft: '',
 				sending: false,
 				scrollTop: 0,
@@ -161,22 +165,29 @@
 				this.sending = true
 				this.scrollToBottom()
 
-				setTimeout(() => {
-					const cards = [{
-						id: 101,
-						title: '3步建立家庭沟通规则',
-						desc: '从“讲道理”到“能执行”的落地模板',
-						price: '19.9'
-					}]
+				aiChat({
+					message: text,
+					conversation_id: this.conversationId,
+					agent_id: this.agentId
+				}).then((res) => {
+					this.conversationId = (res.data && res.data.conversation_id) || this.conversationId
+					const replyText = (res.data && res.data.reply) || ''
 					this.messages.push({
 						id: uid(),
 						role: 'bot',
-						text: `我理解你的困扰。我们先把目标定清楚：你更希望孩子做到“立刻停止顶嘴”，还是“能表达但不伤人”？我会按“先共情-再边界-再选择题”的顺序给你一句句可直接照读的表达。`,
-						cards
+						text: replyText || '服务繁忙，请稍后再试。'
 					})
+				}).catch((err) => {
+					const msg = typeof err === 'string' ? err : ((err && err.msg) || '服务繁忙，请稍后再试。')
+					this.messages.push({
+						id: uid(),
+						role: 'bot',
+						text: msg
+					})
+				}).finally(() => {
 					this.sending = false
 					this.scrollToBottom()
-				}, 650)
+				})
 			}
 		}
 	}

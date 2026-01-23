@@ -15,6 +15,7 @@ import user from './modules/user';
 // import echarts from './modules/echarts'
 import setting from './modules/setting';
 import agent from './modules/agent';
+import ai from './modules/ai';
 import finance from './modules/finance';
 import cms from './modules/cms';
 import forum from './modules/forum';
@@ -160,6 +161,7 @@ const frameIn = [
   },
   index,
   agent,
+  ai,
   cms,
   forum,
   product,

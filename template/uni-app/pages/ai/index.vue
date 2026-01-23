@@ -80,6 +80,9 @@
 	import {
 		getShare
 	} from '@/api/public.js'
+	import {
+		aiChat
+	} from '@/api/ai.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
 
 	function uid() {
@@ -98,6 +101,7 @@
 				showBar: false,
 				showIntro: true,
 				agentId: 'hyqz_default',
+				conversationId: '',
 				heroLogoFallback: '/static/images/jf-head.png',
 				heroLogoSrc: '/static/images/jf-head.png',
 				shareInfo: {},
@@ -272,21 +276,33 @@
 				this.sending = true
 				this.scrollToBottom()
 
-				setTimeout(() => {
+				aiChat({
+					message: text,
+					conversation_id: this.conversationId,
+					agent_id: this.agentId
+				}).then((res) => {
 					this.replyCount += 1
 					const shouldRecommend = this.replyCount === 1 || this.replyCount % 2 === 0
 					const cards = shouldRecommend ? [this.recommendPool[this.replyCount % this.recommendPool.length]] : []
-					const replyText = `我理解你的困扰。我们先把目标定清楚：你更希望孩子做到“立刻停止”，还是“能表达但不伤人”？我会按“先共情-再边界-再选择题”的顺序给你一句句可直接照读的表达。`
-
+					this.conversationId = (res.data && res.data.conversation_id) || this.conversationId
+					const replyText = (res.data && res.data.reply) || ''
 					this.messages.push({
 						id: uid(),
 						role: 'bot',
-						text: replyText,
+						text: replyText || '服务繁忙，请稍后再试。',
 						cards
 					})
+				}).catch((err) => {
+					const msg = typeof err === 'string' ? err : ((err && err.msg) || '服务繁忙，请稍后再试。')
+					this.messages.push({
+						id: uid(),
+						role: 'bot',
+						text: msg
+					})
+				}).finally(() => {
 					this.sending = false
 					this.scrollToBottom()
-				}, 650)
+				})
 			}
 		},
 		//#ifdef MP

@@ -14,11 +14,11 @@
 				>
 					<view class="foot-item flex-1 flex-col flex-center h-96 relative" v-for="(item, index) in newData.menuList" :key="index" @click="goRouter(item)">
 						<template v-if="item.link.split('?')[0] == activeRouter">
-							<image v-if="newData.navStyleConfig.tabVal != 1" :src="item.imgList[0]"></image>
+							<image class="foot-img" v-if="newData.navStyleConfig.tabVal != 1" :src="item.imgList[0]"></image>
 							<view v-if="newData.navStyleConfig.tabVal != 2" class="txt active" :style="[txtActiveColor]">{{ item.name }}</view>
 						</template>
 						<template v-else>
-							<image v-if="newData.navStyleConfig.tabVal != 1" :src="item.imgList[1]"></image>
+							<image class="foot-img" v-if="newData.navStyleConfig.tabVal != 1" :src="item.imgList[1]"></image>
 							<view v-if="newData.navStyleConfig.tabVal != 2" class="txt" :style="[txtColor]">{{ item.name }}</view>
 						</template>
 						<BaseBadge v-if="item.link === '/pages/order_addcart/order_addcart' && cartNum > 0" class="uni-badge-left-margin" :text="cartNum" absolute="rightTop"></BaseBadge>
@@ -220,7 +220,7 @@ export default {
 	left: 0;
 	display: flex;
 
-	.foot-item image {
+	.foot-item .foot-img {
 		display: block;
 		height: 48rpx;
 		width: 48rpx;

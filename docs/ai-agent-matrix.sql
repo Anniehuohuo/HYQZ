@@ -1,0 +1,28 @@
+CREATE TABLE eb_ai_categories (
+  id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  cate_key VARCHAR(32) NOT NULL UNIQUE COMMENT '分类标识',
+  cate_name VARCHAR(64) NOT NULL COMMENT '分类名称',
+  sort INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分类排序权重',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_status_sort (status, sort)
+) COMMENT = 'AI智能体分类表';
+
+CREATE TABLE eb_ai_agents (
+  id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+  agent_name VARCHAR(64) NOT NULL COMMENT '智能体名称',
+  avatar VARCHAR(255) NOT NULL DEFAULT '' COMMENT '智能体图标地址',
+  description VARCHAR(255) NOT NULL COMMENT '智能体简短描述',
+  category_id INT UNSIGNED NOT NULL COMMENT '关联分类ID',
+  bot_id VARCHAR(128) NOT NULL COMMENT '智谱智能体ID',
+  api_key VARCHAR(255) NOT NULL COMMENT '访问密钥',
+  tags VARCHAR(255) NOT NULL DEFAULT '' COMMENT '标签',
+  sort INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '排序权重',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  CONSTRAINT fk_ai_agents_category FOREIGN KEY (category_id) REFERENCES eb_ai_categories(id),
+  UNIQUE KEY uq_bot_id (bot_id),
+  KEY idx_category_status_sort (category_id, status, sort)
+) COMMENT = 'AI智能体核心配置表';

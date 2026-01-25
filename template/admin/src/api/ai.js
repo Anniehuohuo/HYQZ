@@ -25,3 +25,79 @@ export function saveHomeAgentConfigApi(data) {
   });
 }
 
+export function getAiAgentCategoriesApi(params) {
+  return request({
+    url: 'ai/agent_categories',
+    method: 'get',
+    params,
+  });
+}
+
+export function createAiAgentCategoryApi(data) {
+  return request({
+    url: 'ai/agent_categories',
+    method: 'post',
+    data,
+  });
+}
+
+export function updateAiAgentCategoryApi(id, data) {
+  return request({
+    url: `ai/agent_categories/${id}`,
+    method: 'put',
+    data,
+  });
+}
+
+export function deleteAiAgentCategoryApi(id) {
+  return request({
+    url: `ai/agent_categories/${id}`,
+    method: 'delete',
+  });
+}
+
+export function setAiAgentCategoryStatusApi(id, status) {
+  return request({
+    url: `ai/agent_categories/set_status/${id}/${status}`,
+    method: 'put',
+  });
+}
+
+export function getAiAgentsApi(params) {
+  return request({
+    url: 'ai/agents',
+    method: 'get',
+    params,
+  });
+}
+
+export function createAiAgentApi(data) {
+  return request({
+    url: 'ai/agents',
+    method: 'post',
+    data,
+  });
+}
+
+export function updateAiAgentApi(id, data) {
+  return request({
+    url: `ai/agents/${id}`,
+    method: 'put',
+    data,
+  });
+}
+
+export function deleteAiAgentApi(id) {
+  return request({
+    url: `ai/agents/${id}`,
+    method: 'delete',
+  });
+}
+
+export function setAiAgentStatusApi(id, status) {
+  return request({
+    url: `ai/agents/set_status/${id}/${status}`,
+    method: 'put',
+  });
+}
+

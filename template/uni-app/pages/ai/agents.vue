@@ -74,6 +74,9 @@
 	let sysHeight = uni.getSystemInfoSync().statusBarHeight + 'px'
 	import colors from '@/mixins/color.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
+	import {
+		getAgentMatrix
+	} from '@/api/ai.js'
 
 	export default {
 		mixins: [colors],
@@ -91,52 +94,8 @@
 				categories: [{
 					key: 'all',
 					name: '全部'
-				}, {
-					key: 'comm',
-					name: '亲子沟通'
-				}, {
-					key: 'study',
-					name: '学习习惯'
-				}, {
-					key: 'emotion',
-					name: '情绪管理'
-				}, {
-					key: 'teen',
-					name: '青春期'
 				}],
-				agents: [{
-					id: 'a_comm_1',
-					cate: 'comm',
-					cateName: '亲子沟通',
-					abbr: '沟',
-					name: '沟通教练',
-					desc: '把冲突变成合作：用结构化对话化解顶嘴、争执与冷战。',
-					tags: ['共情', '边界', '修复']
-				}, {
-					id: 'a_study_1',
-					cate: 'study',
-					cateName: '学习习惯',
-					abbr: '学',
-					name: '习惯规划师',
-					desc: '围绕作业拖拉、时间管理与执行力，给到可落地的家庭方案。',
-					tags: ['计划', '执行', '反馈']
-				}, {
-					id: 'a_emotion_1',
-					cate: 'emotion',
-					cateName: '情绪管理',
-					abbr: '情',
-					name: '情绪陪伴官',
-					desc: '帮助父母先稳住自己，再陪孩子把情绪说出来、走出来。',
-					tags: ['稳定', '倾听', '复盘']
-				}, {
-					id: 'a_teen_1',
-					cate: 'teen',
-					cateName: '青春期',
-					abbr: '青',
-					name: '青春期顾问',
-					desc: '应对对抗、隐私、手机与学业压力，兼顾关系与规则。',
-					tags: ['规则', '信任', '协商']
-				}]
+				agents: []
 			}
 		},
 		computed: {
@@ -159,7 +118,45 @@
 				})
 			}
 		},
+		onLoad() {
+			this.loadData()
+		},
 		methods: {
+			loadData() {
+				getAgentMatrix().then(res => {
+					const list = res.data || []
+					const cats = [{
+						key: 'all',
+						name: '全部'
+					}]
+					const agents = []
+
+					list.forEach(c => {
+						cats.push({
+							key: c.cate_key,
+							name: c.cate_name
+						})
+						if (c.agents && c.agents.length) {
+							c.agents.forEach(a => {
+								agents.push({
+									id: a.id,
+									cate: c.cate_key,
+									cateName: c.cate_name,
+									abbr: a.abbr || a.agent_name.slice(0, 1),
+									name: a.agent_name,
+									desc: a.description,
+									tags: a.tags || []
+								})
+							})
+						}
+					})
+
+					this.categories = cats
+					this.agents = agents
+				}).catch(err => {
+					// uni.showToast({ title: err.msg || '加载失败', icon: 'none' })
+				})
+			},
 			newDataStatus(val, num) {
 				this.isFooter = !!val
 				this.showBar = !!val

@@ -6,25 +6,6 @@
 					<view class="bubble">
 						<text class="bubbleText">{{ m.text }}</text>
 					</view>
-					<view class="cards" v-if="m.cards && m.cards.length">
-						<view class="card" v-for="c in m.cards" :key="c.id" @click="goProduct(c)">
-							<view class="cardCover">
-								<view class="cardLabel">
-									<text class="cardLabelText">课件</text>
-								</view>
-							</view>
-							<view class="cardBody">
-								<text class="cardTitle">{{ c.title }}</text>
-								<text class="cardDesc">{{ c.desc }}</text>
-								<view class="cardFoot">
-									<text class="cardPrice">￥{{ c.price }}</text>
-									<view class="cardBtn">
-										<text class="cardBtnText">购买</text>
-									</view>
-								</view>
-							</view>
-						</view>
-					</view>
 				</view>
 
 				<view class="typing" v-if="sending">
@@ -49,16 +30,22 @@
 			</view>
 			<view class="safePad"></view>
 		</view>
-		<pageFooter @newDataStatus="newDataStatus" v-show="showBar"></pageFooter>
 	</view>
 </template>
 
 <script>
 	import colors from '@/mixins/color.js'
 	import {
-		aiChat
+		aiChat,
+		getChatHistory,
+		getRecentSession
 	} from '@/api/ai.js'
-	import pageFooter from '@/components/pageFooter/index.vue'
+	import {
+		HTTP_REQUEST_URL,
+		HEADER,
+		TOKENNAME
+	} from '@/config/app.js'
+	import store from '@/store'
 
 	function uid() {
 		return `${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -66,44 +53,29 @@
 
 	export default {
 		mixins: [colors],
-		components: {
-			pageFooter
-		},
 		data() {
 			return {
-				isFooter: false,
-				pdHeight: 0,
-				showBar: false,
 				agentId: '',
 				title: '',
 				conversationId: '',
+				sessionId: 0,
 				draft: '',
 				sending: false,
 				scrollTop: 0,
 				messages: [],
-				suggestions: ['孩子顶嘴很严重', '写作业太拖拉', '情绪失控后怎么修复', '手机规则怎么立']
+				suggestions: ['孩子顶嘴很严重', '写作业太拖拉', '情绪失控后怎么修复', '手机规则怎么立'],
+				requestTask: null
 			}
 		},
 		computed: {
 			pagePad() {
-				if (this.isFooter) {
-					return {
-						paddingBottom: `${this.pdHeight * 2 + 120}rpx`
-					}
-				}
 				return {}
 			},
-			footerOffsetRpx() {
-				if (!this.isFooter) return 0
-				return this.pdHeight * 2 + 100
-			},
 			footerBottom() {
-				if (!this.isFooter) return '0rpx'
-				return `${this.footerOffsetRpx}rpx`
+				return '0rpx'
 			},
 			chatHeight() {
-				if (!this.isFooter) return 'calc(100vh - 260rpx)'
-				return `calc(100vh - 260rpx - ${this.footerOffsetRpx}rpx)`
+				return 'calc(100vh - 260rpx)'
 			},
 			draftTrim() {
 				return (this.draft || '').trim()
@@ -116,21 +88,50 @@
 				title: this.title || '对话'
 			})
 			const prefill = options.prefill ? decodeURIComponent(options.prefill) : ''
+			
+			// Initial welcome message
 			this.messages = [{
 				id: uid(),
 				role: 'bot',
 				text: '把发生的场景描述给我：谁、在什么时间、说了什么、你怎么回应的？我会给你一套可执行的沟通步骤。'
 			}]
+
+			if (this.agentId && this.agentId !== 'hyqz_default') {
+				getRecentSession({
+					agent_id: this.agentId
+				}).then(res => {
+					if (res.data && res.data.id) {
+						this.sessionId = res.data.id
+						this.loadHistory()
+					}
+				})
+			}
+
 			if (prefill) {
 				this.draft = prefill
 				this.send()
 			}
 		},
 		methods: {
-			newDataStatus(val, num) {
-				this.isFooter = !!val
-				this.showBar = !!val
-				this.pdHeight = num || 0
+			loadHistory() {
+				if (!this.sessionId) return
+				getChatHistory({
+					session_id: this.sessionId,
+					page: 1,
+					limit: 50
+				}).then(res => {
+					const list = res.data || []
+					if (list.length > 0) {
+						const msgs = list.map(m => ({
+							id: m.id,
+							role: m.role === 'user' ? 'user' : 'bot',
+							text: m.content
+						}))
+						// Replace initial welcome message with history
+						this.messages = msgs
+						this.scrollToBottom()
+					}
+				})
 			},
 			noop() {
 			},
@@ -141,11 +142,6 @@
 			goAgents() {
 				uni.navigateTo({
 					url: '/pages/ai/agents'
-				})
-			},
-			goProduct(card) {
-				uni.navigateTo({
-					url: `/pages/goods_details/index?id=${card.id}`
 				})
 			},
 			scrollToBottom() {
@@ -165,29 +161,182 @@
 				this.sending = true
 				this.scrollToBottom()
 
-				aiChat({
-					message: text,
-					conversation_id: this.conversationId,
-					agent_id: this.agentId
-				}).then((res) => {
-					this.conversationId = (res.data && res.data.conversation_id) || this.conversationId
-					const replyText = (res.data && res.data.reply) || ''
-					this.messages.push({
-						id: uid(),
-						role: 'bot',
-						text: replyText || '服务繁忙，请稍后再试。'
-					})
-				}).catch((err) => {
-					const msg = typeof err === 'string' ? err : ((err && err.msg) || '服务繁忙，请稍后再试。')
-					this.messages.push({
-						id: uid(),
-						role: 'bot',
-						text: msg
-					})
-				}).finally(() => {
+				const token = store.state.app.token
+				const header = { ...HEADER
+				}
+				header['content-type'] = 'application/json'
+				if (token) header[TOKENNAME] = 'Bearer ' + token
+
+				// Bot message placeholder
+				const botMsgId = uid()
+				this.messages.push({
+					id: botMsgId,
+					role: 'bot',
+					text: ''
+				})
+				const botMsgIndex = this.messages.length - 1
+				let pendingChunk = ''
+
+				if (!token) {
+					this.messages[botMsgIndex].text = '请先登录'
 					this.sending = false
 					this.scrollToBottom()
+					return
+				}
+
+				if (!this.agentId || this.agentId === 'hyqz_default') {
+					this.messages[botMsgIndex].text = '请先选择一个智能体'
+					this.sending = false
+					this.scrollToBottom()
+					return
+				}
+
+				const handleLine = (rawLine) => {
+					let line = (rawLine || '').trim()
+					if (!line) return
+					if (line.startsWith('data:')) {
+						const dataStr = line.replace(/^data:\s*/, '')
+						if (dataStr === '[DONE]') {
+							this.sending = false
+							return
+						}
+						try {
+							const data = JSON.parse(dataStr)
+							if (data.session_id) this.sessionId = data.session_id
+							if (data.content) {
+								this.messages[botMsgIndex].text += data.content
+								this.scrollToBottom()
+							}
+							if (data.error) {
+								this.messages[botMsgIndex].text = data.error
+								this.scrollToBottom()
+							}
+						} catch (e) {
+							if (dataStr) {
+								this.messages[botMsgIndex].text += dataStr
+								this.scrollToBottom()
+							}
+						}
+						return
+					}
+
+					if (line.startsWith('{') && line.endsWith('}')) {
+						try {
+							const data = JSON.parse(line)
+							const msg = data.msg || data.error || data.message
+							if (msg) {
+								this.messages[botMsgIndex].text = msg
+								this.sending = false
+								this.scrollToBottom()
+							}
+						} catch (e) {}
+					}
+				}
+
+				const processChunk = (chunk, flush = false) => {
+					if (chunk) pendingChunk += chunk
+					const lines = pendingChunk.split(/\r?\n/)
+					pendingChunk = lines.pop() || ''
+					for (let line of lines) handleLine(line)
+					if (flush && pendingChunk.trim()) {
+						handleLine(pendingChunk)
+						pendingChunk = ''
+					}
+				}
+
+				// #ifdef H5
+				fetch(HTTP_REQUEST_URL + '/api/ai/chat', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						[TOKENNAME]: 'Bearer ' + token
+					},
+					body: JSON.stringify({
+						agent_id: this.agentId,
+						session_id: this.sessionId,
+						message: text,
+						stream: true
+					})
+				}).then(response => {
+					const reader = response.body.getReader()
+					const decoder = new TextDecoder()
+					const read = () => {
+						reader.read().then(({
+							done,
+							value
+						}) => {
+							if (done) {
+								processChunk('', true)
+								this.sending = false
+								return
+							}
+							const chunk = decoder.decode(value)
+							processChunk(chunk)
+							read()
+						})
+					}
+					read()
+				}).catch(err => {
+					this.messages[botMsgIndex].text = '发送失败'
+					this.sending = false
 				})
+				// #endif
+
+				// #ifndef H5
+				this.requestTask = uni.request({
+					url: HTTP_REQUEST_URL + '/api/ai/chat',
+					method: 'POST',
+					header: header,
+					data: {
+						agent_id: this.agentId,
+						session_id: this.sessionId,
+						message: text,
+						stream: true
+					},
+					enableChunked: true,
+					responseType: 'text',
+					success: (res) => {
+						if (res && res.data) {
+							if (typeof res.data === 'string') {
+								processChunk(res.data, true)
+							} else {
+								try {
+									processChunk(new TextDecoder('utf-8').decode(new Uint8Array(res.data)), true)
+								} catch (e) {}
+							}
+						} else {
+							processChunk('', true)
+						}
+					},
+					fail: (err) => {
+						this.messages[botMsgIndex].text = '发送失败: ' + (err.errMsg || '网络错误')
+					},
+					complete: () => {
+						processChunk('', true)
+						this.sending = false
+						this.scrollToBottom()
+					}
+				})
+				if (this.requestTask && this.requestTask.onChunkReceived) {
+					this.requestTask.onChunkReceived((res) => {
+						let chunk = ''
+						if (typeof res.data === 'string') {
+							chunk = res.data
+						} else {
+							// For ArrayBuffer
+							// Note: TextDecoder might not exist in some environments (e.g. older Android Webview in App)
+							// But basic support is usually there or polyfilled in uni-app.
+							// If not, we might need a simple utf8 decode function.
+							try {
+								chunk = new TextDecoder('utf-8').decode(new Uint8Array(res.data))
+							} catch (e) {
+								console.error('TextDecoder not supported', e)
+							}
+						}
+						processChunk(chunk)
+					})
+				}
+				// #endif
 			}
 		}
 	}
@@ -243,84 +392,6 @@
 
 	.msg.user .bubbleText {
 		color: rgba(31, 35, 41, 0.92);
-	}
-
-	.cards {
-		margin-top: 12rpx;
-		width: 620rpx;
-	}
-
-	.card {
-		display: flex;
-		border-radius: 18rpx;
-		overflow: hidden;
-		background: #fff;
-		border: 1rpx solid rgba(0, 0, 0, 0.06);
-	}
-
-	.cardCover {
-		width: 170rpx;
-		background: linear-gradient(135deg, rgba(241, 165, 92, 0.18) 0%, rgba(241, 165, 92, 0.07) 100%);
-		position: relative;
-	}
-
-	.cardLabel {
-		position: absolute;
-		left: 12rpx;
-		top: 12rpx;
-		padding: 8rpx 12rpx;
-		border-radius: 999rpx;
-		background: rgba(255, 255, 255, 0.9);
-	}
-
-	.cardLabelText {
-		font-size: 22rpx;
-		color: #a95608;
-	}
-
-	.cardBody {
-		flex: 1;
-		padding: 16rpx 16rpx 14rpx;
-	}
-
-	.cardTitle {
-		display: block;
-		font-size: 28rpx;
-		font-weight: 900;
-		color: #1f2329;
-	}
-
-	.cardDesc {
-		margin-top: 6rpx;
-		display: block;
-		font-size: 24rpx;
-		color: rgba(31, 35, 41, 0.62);
-	}
-
-	.cardFoot {
-		margin-top: 12rpx;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.cardPrice {
-		font-size: 28rpx;
-		font-weight: 900;
-		color: var(--view-theme);
-	}
-
-	.cardBtn {
-		padding: 10rpx 16rpx;
-		border-radius: 16rpx;
-		background: rgba(241, 165, 92, 0.08);
-		border: 1rpx solid rgba(241, 165, 92, 0.20);
-	}
-
-	.cardBtnText {
-		font-size: 24rpx;
-		font-weight: 800;
-		color: #a95608;
 	}
 
 	.typing {

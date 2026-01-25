@@ -1,0 +1,358 @@
+openapi: 3.0.3
+info:
+  title: AI智能体矩阵接口
+  version: 1.0.0
+  description: |
+    用于“智能体矩阵”配置与用户端读取/对话选择。
+    统一返回结构：{ status, msg, data? }，其中 status=200 表示成功，status=400 表示失败。
+servers:
+  - url: /
+components:
+  securitySchemes:
+    AdminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Bearer {token}
+  schemas:
+    JsonSuccess:
+      type: object
+      properties:
+        status: { type: integer, example: 200 }
+        msg: { type: string, example: success }
+        data: { nullable: true }
+      required: [status, msg]
+    JsonFail:
+      type: object
+      properties:
+        status: { type: integer, example: 400 }
+        msg: { type: string, example: fail }
+        data: { nullable: true }
+      required: [status, msg]
+    Category:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        cate_key: { type: string, example: comm }
+        cate_name: { type: string, example: 亲子沟通 }
+        sort: { type: integer, example: 100 }
+        status: { type: integer, enum: [0, 1], example: 1 }
+        created_at: { type: string, example: "2026-01-24 10:00:00" }
+        updated_at: { type: string, example: "2026-01-24 10:00:00" }
+      required: [id, cate_key, cate_name, sort, status]
+    Agent:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        agent_name: { type: string, example: 沟通教练 }
+        avatar: { type: string, example: "" }
+        description: { type: string, example: 把冲突变成合作：用结构化对话化解顶嘴、争执与冷战。 }
+        category_id: { type: integer, example: 1 }
+        bot_id: { type: string, example: "1791378613740900352" }
+        api_key: { type: string, example: "******" }
+        tags: { type: string, example: "共情,边界,修复" }
+        sort: { type: integer, example: 100 }
+        status: { type: integer, enum: [0, 1], example: 1 }
+        created_at: { type: string, example: "2026-01-24 10:00:00" }
+        updated_at: { type: string, example: "2026-01-24 10:00:00" }
+        cate_key: { type: string, example: comm }
+        cate_name: { type: string, example: 亲子沟通 }
+      required: [id, agent_name, description, category_id, bot_id, api_key, sort, status]
+
+paths:
+  /api/ai/agent_matrix:
+    get:
+      summary: 用户端获取智能体矩阵（启用的分类与智能体）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                cate_key: { type: string }
+                                cate_name: { type: string }
+                                sort: { type: integer }
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                agent_name: { type: string }
+                                avatar: { type: string }
+                                description: { type: string }
+                                category_id: { type: integer }
+                                cate_key: { type: string }
+                                cate_name: { type: string }
+                                tags:
+                                  type: array
+                                  items: { type: string }
+                                abbr: { type: string }
+  /api/ai/chat:
+    post:
+      summary: AI对话（支持选择矩阵智能体）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message: { type: string }
+                conversation_id: { type: string }
+                agent_id:
+                  type: string
+                  description: 数值ID表示从 ai_agents 读取；非数字/空表示走“首页引流助手”默认配置
+              required: [message]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          reply: { type: string }
+                          conversation_id: { type: string }
+        "400":
+          description: Fail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JsonFail" }
+
+  /adminapi/ai/agent_categories:
+    get:
+      summary: 管理端分类列表
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: integer, enum: [0, 1] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items: { $ref: "#/components/schemas/Category" }
+                          count: { type: integer }
+    post:
+      summary: 管理端新增分类
+      security: [{ AdminBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cate_key: { type: string, maxLength: 32 }
+                cate_name: { type: string, maxLength: 64 }
+                sort: { type: integer }
+                status: { type: integer, enum: [0, 1] }
+              required: [cate_key, cate_name]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+        "400": { description: Fail, content: { application/json: { schema: { $ref: "#/components/schemas/JsonFail" } } } }
+
+  /adminapi/ai/agent_categories/{id}:
+    put:
+      summary: 管理端编辑分类
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cate_key: { type: string, maxLength: 32 }
+                cate_name: { type: string, maxLength: 64 }
+                sort: { type: integer }
+                status: { type: integer, enum: [0, 1] }
+              required: [cate_key, cate_name]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+    delete:
+      summary: 管理端删除分类
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+
+  /adminapi/ai/agent_categories/set_status/{id}/{status}:
+    put:
+      summary: 管理端分类状态切换
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: status
+          required: true
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+
+  /adminapi/ai/agents:
+    get:
+      summary: 管理端智能体列表
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: category_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: integer, enum: [0, 1] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items: { $ref: "#/components/schemas/Agent" }
+                          count: { type: integer }
+    post:
+      summary: 管理端新增智能体
+      security: [{ AdminBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_name: { type: string, maxLength: 64 }
+                avatar: { type: string, maxLength: 255 }
+                description: { type: string, maxLength: 255 }
+                category_id: { type: integer }
+                bot_id: { type: string, maxLength: 128 }
+                api_key: { type: string, maxLength: 255 }
+                tags: { type: string, maxLength: 255 }
+                sort: { type: integer }
+                status: { type: integer, enum: [0, 1] }
+              required: [agent_name, description, category_id, bot_id, api_key]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+        "400": { description: Fail, content: { application/json: { schema: { $ref: "#/components/schemas/JsonFail" } } } }
+
+  /adminapi/ai/agents/{id}:
+    put:
+      summary: 管理端编辑智能体
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_name: { type: string, maxLength: 64 }
+                avatar: { type: string, maxLength: 255 }
+                description: { type: string, maxLength: 255 }
+                category_id: { type: integer }
+                bot_id: { type: string, maxLength: 128 }
+                api_key: { type: string, maxLength: 255 }
+                tags: { type: string, maxLength: 255 }
+                sort: { type: integer }
+                status: { type: integer, enum: [0, 1] }
+              required: [agent_name, description, category_id, bot_id, api_key]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+    delete:
+      summary: 管理端删除智能体
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+
+  /adminapi/ai/agents/set_status/{id}/{status}:
+    put:
+      summary: 管理端智能体状态切换
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: status
+          required: true
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/JsonSuccess" } } } }
+

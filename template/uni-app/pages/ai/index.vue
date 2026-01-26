@@ -8,8 +8,8 @@
 						<view class="heroHead">
 							<view class="heroText">
 								<text class="heroTitle">你好，</text>
-								<text class="heroTitle">小圆为你服务</text>
-								<text class="heroSub">我可以帮你把亲子沟通问题拆清楚，给到可直接照读的引导句式。你想问点什么呢？</text>
+							<text class="heroTitle">{{ heroTitle }}</text>
+							<text class="heroSub">{{ heroSub }}</text>
 							</view>
 							<view class="heroMascot">
 								<view class="mascotGlow"></view>
@@ -81,8 +81,9 @@
 		getShare
 	} from '@/api/public.js'
 	import {
-		aiChat
-	} from '@/api/ai.js'
+		HTTP_REQUEST_URL,
+		HEADER
+	} from '@/config/app.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
 
 	function uid() {
@@ -100,8 +101,9 @@
 				pdHeight: 0,
 				showBar: false,
 				showIntro: true,
-				agentId: 'hyqz_default',
-				conversationId: '',
+				homeAgentEnabled: true,
+				heroTitle: '小圆为你服务',
+				heroSub: '我可以帮你把亲子沟通问题拆清楚，给到可直接照读的引导句式。你想问点什么呢？',
 				heroLogoFallback: '/static/images/jf-head.png',
 				heroLogoSrc: '/static/images/jf-head.png',
 				shareInfo: {},
@@ -131,9 +133,7 @@
 			}
 		},
 		onLoad(options) {
-			if (options && options.agentId) {
-				this.agentId = options.agentId
-			}
+			this.loadHomeAgentConfig()
 			//#ifdef MP
 			uni.showShareMenu({
 				withShareTicket: true,
@@ -187,6 +187,24 @@
 			}
 		},
 		methods: {
+			loadHomeAgentConfig() {
+				uni.request({
+					url: HTTP_REQUEST_URL + '/api/ai/home_config',
+					method: 'GET',
+					success: (res) => {
+						const d = res && res.data && res.data.data ? res.data.data : null
+						if (!d) return
+						const enabled = Number(d.enabled || 0) === 1 && Number(d.status || 0) === 1
+						this.homeAgentEnabled = enabled
+						const name = d.name || '小圆为你服务'
+						this.heroTitle = name
+						if (!enabled) {
+							this.heroSub = '助手暂未启用，请稍后再试'
+						}
+					},
+					fail: () => {}
+				})
+			},
 			buildHeroSvg() {
 				const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <defs>
@@ -264,6 +282,13 @@
 			},
 			send() {
 				if (!this.draftTrim || this.sending) return
+				if (!this.homeAgentEnabled) {
+					uni.showToast({
+						title: '助手暂未启用',
+						icon: 'none'
+					})
+					return
+				}
 				this.showIntro = false
 				const text = this.draftTrim
 				this.draft = ''
@@ -276,33 +301,144 @@
 				this.sending = true
 				this.scrollToBottom()
 
-				aiChat({
-					message: text,
-					conversation_id: this.conversationId,
-					agent_id: this.agentId
-				}).then((res) => {
+				const botMsgIndex = this.messages.length
+				this.messages.push({
+					id: uid(),
+					role: 'bot',
+					text: ''
+				})
+
+				let header = Object.assign({}, HEADER)
+				header['Content-Type'] = 'application/json'
+
+				let pendingChunk = ''
+				const processChunk = (chunk, flush = false) => {
+					pendingChunk += chunk
+					const lines = pendingChunk.split('\n')
+					pendingChunk = lines.pop() || ''
+
+					const handleLine = (line) => {
+						line = (line || '').trim()
+						if (!line) return
+						if (line === 'data: [DONE]' || line === '[DONE]') return
+						if (line.indexOf('data: ') !== 0) return
+						const dataStr = line.slice(6)
+						if (dataStr === '[DONE]') return
+						let data = null
+						try {
+							data = JSON.parse(dataStr)
+						} catch (e) {
+							return
+						}
+						if (data && data.error) {
+							this.messages[botMsgIndex].text = data.error
+							return
+						}
+						if (data && data.content) {
+							this.messages[botMsgIndex].text += data.content
+							this.scrollToBottom()
+						}
+					}
+
+					for (let line of lines) handleLine(line)
+					if (flush && pendingChunk.trim()) {
+						handleLine(pendingChunk)
+						pendingChunk = ''
+					}
+				}
+
+				// #ifdef H5
+				fetch(HTTP_REQUEST_URL + '/api/ai/home_chat', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						message: text,
+						stream: 1
+					})
+				}).then(response => {
+					const reader = response.body.getReader()
+					const decoder = new TextDecoder()
+					const read = () => {
+						reader.read().then(({
+							done,
+							value
+						}) => {
+							if (done) {
+								processChunk('', true)
+								this.sending = false
+								return
+							}
+							const chunk = decoder.decode(value)
+							processChunk(chunk)
+							read()
+						})
+					}
+					read()
+				}).catch((err) => {
+					this.messages[botMsgIndex].text = '发送失败: ' + ((err && err.message) || '网络错误')
+					this.sending = false
+				}).finally(() => {
 					this.replyCount += 1
 					const shouldRecommend = this.replyCount === 1 || this.replyCount % 2 === 0
 					const cards = shouldRecommend ? [this.recommendPool[this.replyCount % this.recommendPool.length]] : []
-					this.conversationId = (res.data && res.data.conversation_id) || this.conversationId
-					const replyText = (res.data && res.data.reply) || ''
-					this.messages.push({
-						id: uid(),
-						role: 'bot',
-						text: replyText || '服务繁忙，请稍后再试。',
-						cards
-					})
-				}).catch((err) => {
-					const msg = typeof err === 'string' ? err : ((err && err.msg) || '服务繁忙，请稍后再试。')
-					this.messages.push({
-						id: uid(),
-						role: 'bot',
-						text: msg
-					})
-				}).finally(() => {
-					this.sending = false
+					this.messages[botMsgIndex].cards = cards
 					this.scrollToBottom()
 				})
+				// #endif
+
+				// #ifndef H5
+				this.requestTask = uni.request({
+					url: HTTP_REQUEST_URL + '/api/ai/home_chat',
+					method: 'POST',
+					header: header,
+					data: {
+						message: text,
+						stream: 1
+					},
+					enableChunked: true,
+					responseType: 'text',
+					success: (res) => {
+						if (res && res.data) {
+							if (typeof res.data === 'string') {
+								processChunk(res.data, true)
+							} else {
+								try {
+									processChunk(new TextDecoder('utf-8').decode(new Uint8Array(res.data)), true)
+								} catch (e) {}
+							}
+						} else {
+							processChunk('', true)
+						}
+					},
+					fail: (err) => {
+						this.messages[botMsgIndex].text = '发送失败: ' + (err.errMsg || '网络错误')
+					},
+					complete: () => {
+						processChunk('', true)
+						this.sending = false
+						this.replyCount += 1
+						const shouldRecommend = this.replyCount === 1 || this.replyCount % 2 === 0
+						const cards = shouldRecommend ? [this.recommendPool[this.replyCount % this.recommendPool.length]] : []
+						this.messages[botMsgIndex].cards = cards
+						this.scrollToBottom()
+					}
+				})
+				if (this.requestTask && this.requestTask.onChunkReceived) {
+					this.requestTask.onChunkReceived((res) => {
+						let chunk = ''
+						if (typeof res.data === 'string') {
+							chunk = res.data
+						} else {
+							try {
+								chunk = new TextDecoder('utf-8').decode(new Uint8Array(res.data))
+							} catch (e) {}
+						}
+						processChunk(chunk)
+					})
+				}
+				// #endif
 			}
 		},
 		//#ifdef MP

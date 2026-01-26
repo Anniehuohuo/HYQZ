@@ -28,7 +28,7 @@ class AiController
             ['agent_id', 0], // Changed default to 0
             ['session_id', 0],
             ['stream', false],
-        ], true);
+        ]);
 
         $message = trim((string)$data['message']);
         if ($message === '') {
@@ -40,26 +40,32 @@ class AiController
         // Use new ChatStream if agentId is provided (Matrix Chat)
         // If agentId is 0, we also return stream error to prevent frontend spinning
         $sessionId = (int)$data['session_id'];
-        return response()->stream(function() use ($uid, $agentId, $message, $sessionId) {
-            if ($agentId <= 0) {
-                 yield "data: " . json_encode(['error' => '请先选择一个智能体'], JSON_UNESCAPED_UNICODE) . "\n\n";
-                 yield "data: [DONE]\n\n";
-                 return;
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('output_buffering', 'off');
+        while (ob_get_level() > 0) {
+            @ob_end_flush();
+        }
+
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        header('Connection: keep-alive');
+        header('X-Accel-Buffering: no');
+
+        if ($agentId <= 0) {
+            echo "data: " . json_encode(['error' => '请先选择一个智能体'], JSON_UNESCAPED_UNICODE) . "\n\n";
+            echo "data: [DONE]\n\n";
+            exit;
+        }
+
+        $generator = $this->aiChatServices->chatStream($uid, $agentId, $message, $sessionId ?: null);
+        foreach ($generator as $chunk) {
+            echo $chunk;
+            if (ob_get_level() > 0) {
+                @ob_flush();
             }
-            $generator = $this->aiChatServices->chatStream($uid, $agentId, $message, $sessionId ?: null);
-            foreach ($generator as $chunk) {
-                echo $chunk;
-                if (ob_get_level() > 0) {
-                    ob_flush();
-                }
-                flush();
-            }
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no' // Nginx buffering off
-        ]);
+            flush();
+        }
+        exit;
 
         /* Old logic fallback removed/commented out to enforce stream consistency
         $ip = (string)($request->ip() ?? '');

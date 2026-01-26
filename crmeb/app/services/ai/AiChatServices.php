@@ -291,6 +291,7 @@ class AiChatServices
     public function getHomeAgentConfig(): array
     {
         $this->ensureConfigItems();
+        $apiKey = (string)sys_config('ai_bigmodel_api_key', '');
         return [
             'name' => (string)sys_config('ai_home_agent_name', '首页引流助手'),
             'status' => (int)sys_config('ai_home_agent_status', 1),
@@ -302,9 +303,9 @@ class AiChatServices
             'growthPolicy' => (string)sys_config('ai_home_agent_growth_policy', ''),
             'fallbackText' => (string)sys_config('ai_home_agent_fallback_text', ''),
             'enabled' => (int)sys_config('ai_enabled', 0),
-            'baseUrl' => (string)sys_config('ai_bigmodel_base_url', 'https://open.bigmodel.cn/api/llm-application/open'),
-            'appId' => (string)sys_config('ai_bigmodel_app_id', ''),
-            'apiKey' => (string)sys_config('ai_bigmodel_api_key', ''),
+            'chatUrl' => (string)sys_config('ai_bigmodel_chat_url', 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
+            'hasApiKey' => $apiKey !== '' ? 1 : 0,
+            'apiKey' => '',
         ];
     }
 
@@ -331,11 +332,273 @@ class AiChatServices
         if (array_key_exists('appId', $data)) {
             $this->setConfig('ai_bigmodel_app_id', (string)$data['appId']);
         }
+        if (array_key_exists('chatUrl', $data)) {
+            $this->setConfig('ai_bigmodel_chat_url', (string)$data['chatUrl']);
+        }
         if (array_key_exists('apiKey', $data)) {
-            $this->setConfig('ai_bigmodel_api_key', (string)$data['apiKey']);
+            $apiKey = trim((string)$data['apiKey']);
+            if ($apiKey !== '') {
+                $this->setConfig('ai_bigmodel_api_key', $apiKey);
+            }
         }
 
         CacheService::clear();
+    }
+
+    public function homeChat(string $message): array
+    {
+        $this->ensureConfigItems();
+        $reqId = md5(uniqid('homechat_', true));
+
+        $enabled = (int)sys_config('ai_enabled', 0);
+        if (!$enabled) {
+            Log::info('ai.home_chat.disabled', ['reqId' => $reqId]);
+            return [
+                'ok' => false,
+                'reply' => (string)sys_config('ai_home_agent_fallback_text', 'AI暂未启用，请稍后再试。'),
+                'error' => 'AI未启用',
+            ];
+        }
+
+        $chatUrl = trim((string)sys_config('ai_bigmodel_chat_url', ''));
+        $apiKey = trim((string)sys_config('ai_bigmodel_api_key', ''));
+        $model = trim((string)sys_config('ai_home_agent_model', ''));
+        $temperature = (float)sys_config('ai_home_agent_temperature', 0.7);
+
+        if ($chatUrl === '') {
+            Log::warning('ai.home_chat.missing_chat_url', ['reqId' => $reqId]);
+            return [
+                'ok' => false,
+                'reply' => (string)sys_config('ai_home_agent_fallback_text', 'AI配置未完成，请先在后台填写接口地址。'),
+                'error' => 'AI接口地址缺失',
+            ];
+        }
+        if ($apiKey === '') {
+            Log::warning('ai.home_chat.missing_api_key', ['reqId' => $reqId]);
+            return [
+                'ok' => false,
+                'reply' => (string)sys_config('ai_home_agent_fallback_text', 'AI配置未完成，请先在后台填写 API Key。'),
+                'error' => 'AI密钥缺失',
+            ];
+        }
+        if ($model === '') {
+            Log::warning('ai.home_chat.missing_model', ['reqId' => $reqId]);
+            return [
+                'ok' => false,
+                'reply' => (string)sys_config('ai_home_agent_fallback_text', 'AI配置未完成，请先在后台填写模型标识。'),
+                'error' => 'AI模型缺失',
+            ];
+        }
+
+        $systemParts = [
+            (string)sys_config('ai_home_agent_system_rules', ''),
+            (string)sys_config('ai_home_agent_persona', ''),
+            (string)sys_config('ai_home_agent_output_format', ''),
+            (string)sys_config('ai_home_agent_growth_policy', ''),
+        ];
+        $systemParts = array_values(array_filter(array_map('trim', $systemParts), static function ($v) {
+            return $v !== '';
+        }));
+        $systemPrompt = implode("\n\n", $systemParts);
+
+        $messages = [];
+        if ($systemPrompt !== '') {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+        $messages[] = ['role' => 'user', 'content' => $message];
+
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'stream' => false,
+            'temperature' => $temperature,
+        ];
+
+        Log::info('ai.home_chat.request', [
+            'reqId' => $reqId,
+            'chatUrl' => $chatUrl,
+            'model' => $model,
+            'temperature' => $temperature,
+            'messageLen' => mb_strlen($message),
+        ]);
+
+        $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $headers = [
+            'Authorization: Bearer ' . $apiKey,
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($body),
+        ];
+
+        $raw = HttpService::postRequest($chatUrl, $body, $headers, 25);
+        if ($raw === false) {
+            $status = HttpService::getStatus();
+            $code = is_array($status) ? ($status['http_code'] ?? 0) : 0;
+            Log::error('ai.home_chat.http_failed', ['reqId' => $reqId, 'httpCode' => $code]);
+            return ['ok' => false, 'reply' => (string)sys_config('ai_home_agent_fallback_text', '服务繁忙，请稍后再试。'), 'error' => 'HTTP请求失败:' . (string)$code];
+        }
+
+        $resp = json_decode($raw, true);
+        if (!is_array($resp)) {
+            Log::error('ai.home_chat.bad_json', ['reqId' => $reqId, 'rawPrefix' => mb_substr((string)$raw, 0, 200)]);
+            return ['ok' => false, 'reply' => (string)sys_config('ai_home_agent_fallback_text', '服务繁忙，请稍后再试。'), 'error' => '响应解析失败'];
+        }
+
+        $reply = '';
+        if (isset($resp['choices'][0]['message']['content']) && is_string($resp['choices'][0]['message']['content'])) {
+            $reply = (string)$resp['choices'][0]['message']['content'];
+        } elseif (isset($resp['choices'][0]['messages']['content']['msg']) && is_string($resp['choices'][0]['messages']['content']['msg'])) {
+            $reply = (string)$resp['choices'][0]['messages']['content']['msg'];
+        } elseif (isset($resp['choices'][0]['text']) && is_string($resp['choices'][0]['text'])) {
+            $reply = (string)$resp['choices'][0]['text'];
+        }
+
+        $reply = trim($reply);
+        if ($reply === '') {
+            Log::warning('ai.home_chat.empty_reply', ['reqId' => $reqId, 'respKeys' => array_keys($resp)]);
+            return ['ok' => false, 'reply' => (string)sys_config('ai_home_agent_fallback_text', '服务繁忙，请稍后再试。'), 'error' => '模型未返回内容'];
+        }
+
+        Log::info('ai.home_chat.ok', ['reqId' => $reqId, 'replyLen' => mb_strlen($reply)]);
+        return ['ok' => true, 'reply' => $reply];
+    }
+
+    public function homeChatStream(string $message): \Generator
+    {
+        $this->ensureConfigItems();
+        $reqId = md5(uniqid('homechat_stream_', true));
+
+        $enabled = (int)sys_config('ai_enabled', 0);
+        if (!$enabled) {
+            Log::info('ai.home_chat_stream.disabled', ['reqId' => $reqId]);
+            yield "data: " . json_encode(['error' => (string)sys_config('ai_home_agent_fallback_text', 'AI暂未启用，请稍后再试。')], JSON_UNESCAPED_UNICODE) . "\n\n";
+            yield "data: [DONE]\n\n";
+            return;
+        }
+
+        $chatUrl = trim((string)sys_config('ai_bigmodel_chat_url', ''));
+        $apiKey = trim((string)sys_config('ai_bigmodel_api_key', ''));
+        $model = trim((string)sys_config('ai_home_agent_model', ''));
+        $temperature = (float)sys_config('ai_home_agent_temperature', 0.7);
+        $thinkingEnabled = (int)sys_config('ai_home_agent_thinking_enabled', 0) === 1;
+
+        if ($chatUrl === '' || $apiKey === '' || $model === '') {
+            Log::warning('ai.home_chat_stream.missing_config', [
+                'reqId' => $reqId,
+                'hasChatUrl' => $chatUrl !== '' ? 1 : 0,
+                'hasApiKey' => $apiKey !== '' ? 1 : 0,
+                'hasModel' => $model !== '' ? 1 : 0,
+            ]);
+            yield "data: " . json_encode(['error' => (string)sys_config('ai_home_agent_fallback_text', 'AI配置未完成，请先在后台填写接口地址、模型与 API Key。')], JSON_UNESCAPED_UNICODE) . "\n\n";
+            yield "data: [DONE]\n\n";
+            return;
+        }
+
+        $systemParts = [
+            (string)sys_config('ai_home_agent_system_rules', ''),
+            (string)sys_config('ai_home_agent_persona', ''),
+            (string)sys_config('ai_home_agent_output_format', ''),
+            (string)sys_config('ai_home_agent_growth_policy', ''),
+        ];
+        $systemParts = array_values(array_filter(array_map('trim', $systemParts), static function ($v) {
+            return $v !== '';
+        }));
+        $systemPrompt = implode("\n\n", $systemParts);
+
+        $messages = [];
+        if ($systemPrompt !== '') {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+        $messages[] = ['role' => 'user', 'content' => $message];
+
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'stream' => true,
+            'temperature' => $temperature,
+        ];
+        if ($thinkingEnabled) {
+            $payload['thinking'] = ['type' => 'enabled'];
+        }
+
+        Log::info('ai.home_chat_stream.request', [
+            'reqId' => $reqId,
+            'chatUrl' => $chatUrl,
+            'model' => $model,
+            'temperature' => $temperature,
+            'thinking' => $thinkingEnabled ? 1 : 0,
+            'messageLen' => mb_strlen($message),
+        ]);
+
+        $opts = [
+            'http' => [
+                'method' => 'POST',
+                'header' => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey,
+                ],
+                'content' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'timeout' => 60,
+                'ignore_errors' => true,
+            ],
+        ];
+
+        $context = stream_context_create($opts);
+        $fp = fopen($chatUrl, 'r', false, $context);
+        if (!$fp) {
+            Log::error('ai.home_chat_stream.connect_failed', ['reqId' => $reqId]);
+            yield "data: " . json_encode(['error' => '连接AI服务失败'], JSON_UNESCAPED_UNICODE) . "\n\n";
+            yield "data: [DONE]\n\n";
+            return;
+        }
+
+        $assistantContent = '';
+        while (!feof($fp)) {
+            $line = fgets($fp);
+            if ($line === false) {
+                usleep(50_000);
+                continue;
+            }
+            $line = trim($line);
+            if ($line === '' || strpos($line, 'data:') !== 0) {
+                continue;
+            }
+            $dataStr = trim(substr($line, 5));
+            if ($dataStr === '[DONE]') {
+                break;
+            }
+
+            $data = json_decode($dataStr, true);
+            if (!is_array($data)) {
+                Log::warning('ai.home_chat_stream.bad_json_line', ['reqId' => $reqId, 'linePrefix' => mb_substr($dataStr, 0, 200)]);
+                continue;
+            }
+            if (!empty($data['error'])) {
+                Log::error('ai.home_chat_stream.remote_error', ['reqId' => $reqId, 'error' => (string)$data['error']]);
+                yield "data: " . json_encode(['error' => (string)$data['error']], JSON_UNESCAPED_UNICODE) . "\n\n";
+                break;
+            }
+
+            $content = '';
+            if (isset($data['choices'][0]['delta']['content']) && is_string($data['choices'][0]['delta']['content'])) {
+                $content = (string)$data['choices'][0]['delta']['content'];
+            } elseif (isset($data['choices'][0]['message']['content']) && is_string($data['choices'][0]['message']['content'])) {
+                $content = (string)$data['choices'][0]['message']['content'];
+            }
+
+            if ($content !== '') {
+                $assistantContent .= $content;
+                yield "data: " . json_encode(['content' => $content], JSON_UNESCAPED_UNICODE) . "\n\n";
+            }
+        }
+        fclose($fp);
+
+        if ($assistantContent === '') {
+            Log::warning('ai.home_chat_stream.empty_reply', ['reqId' => $reqId]);
+            yield "data: " . json_encode(['error' => (string)sys_config('ai_home_agent_fallback_text', '服务繁忙，请稍后再试。')], JSON_UNESCAPED_UNICODE) . "\n\n";
+        } else {
+            Log::info('ai.home_chat_stream.ok', ['reqId' => $reqId, 'replyLen' => mb_strlen($assistantContent)]);
+        }
+        yield "data: [DONE]\n\n";
     }
 
     public function chat(string $message, string $conversationId = '', string $agentId = ''): array
@@ -466,12 +729,14 @@ class AiChatServices
         $items = [
             'ai_enabled' => ['type' => 'switch', 'default' => 0, 'info' => 'AI开关'],
             'ai_bigmodel_base_url' => ['type' => 'text', 'default' => 'https://open.bigmodel.cn/api/llm-application/open', 'info' => 'AI服务地址'],
+            'ai_bigmodel_chat_url' => ['type' => 'text', 'default' => 'https://open.bigmodel.cn/api/paas/v4/chat/completions', 'info' => 'AI聊天接口地址'],
             'ai_bigmodel_app_id' => ['type' => 'text', 'default' => '', 'info' => 'AI应用ID'],
             'ai_bigmodel_api_key' => ['type' => 'text', 'default' => '', 'info' => 'AI密钥'],
             'ai_home_agent_name' => ['type' => 'text', 'default' => '首页引流助手', 'info' => '首页助手名称'],
             'ai_home_agent_status' => ['type' => 'switch', 'default' => 1, 'info' => '首页助手状态'],
             'ai_home_agent_model' => ['type' => 'text', 'default' => '', 'info' => '模型标识'],
             'ai_home_agent_temperature' => ['type' => 'text', 'input_type' => 'number', 'default' => 0.7, 'info' => '温度'],
+            'ai_home_agent_thinking_enabled' => ['type' => 'switch', 'default' => 0, 'info' => '思考开关'],
             'ai_home_agent_system_rules' => ['type' => 'textarea', 'default' => '', 'info' => '系统规则'],
             'ai_home_agent_persona' => ['type' => 'textarea', 'default' => '', 'info' => '人设与语气'],
             'ai_home_agent_output_format' => ['type' => 'textarea', 'default' => '', 'info' => '输出结构'],

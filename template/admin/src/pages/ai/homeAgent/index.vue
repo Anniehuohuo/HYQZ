@@ -8,14 +8,16 @@
         <el-form-item label="AI开关">
           <el-switch v-model="form.enabled" active-text="启用" inactive-text="停用"></el-switch>
         </el-form-item>
-        <el-form-item label="服务地址">
-          <el-input v-model="form.baseUrl" placeholder="https://open.bigmodel.cn/api/llm-application/open"></el-input>
-        </el-form-item>
-        <el-form-item label="App ID">
-          <el-input v-model="form.appId" placeholder="例如：1791378613740900352"></el-input>
+        <el-form-item label="接口地址">
+          <el-input v-model="form.chatUrl" placeholder="例如：https://open.bigmodel.cn/api/paas/v4/chat/completions"></el-input>
         </el-form-item>
         <el-form-item label="API Key">
-          <el-input v-model="form.apiKey" type="password" show-password placeholder="例如：xxxx"></el-input>
+          <el-input
+            v-model="form.apiKey"
+            type="password"
+            show-password
+            :placeholder="form.hasApiKey ? '已设置（不展示），如需修改请重新填写' : '请输入 API Key'"
+          ></el-input>
         </el-form-item>
         <el-form-item label="名称">
           <el-input v-model="form.name" placeholder="例如：首页引流助手"></el-input>
@@ -61,9 +63,9 @@ export default {
     return {
       form: {
         enabled: false,
-        baseUrl: 'https://open.bigmodel.cn/api/llm-application/open',
-        appId: '',
+        chatUrl: '',
         apiKey: '',
+        hasApiKey: false,
         name: '首页引流助手',
         status: true,
         model: '',
@@ -85,9 +87,9 @@ export default {
         .then((res) => {
           const d = res.data || {};
           this.form.enabled = !!d.enabled;
-          this.form.baseUrl = d.baseUrl || this.form.baseUrl;
-          this.form.appId = d.appId || '';
-          this.form.apiKey = d.apiKey || '';
+          this.form.chatUrl = d.chatUrl || '';
+          this.form.hasApiKey = !!d.hasApiKey;
+          this.form.apiKey = '';
           this.form.name = d.name || this.form.name;
           this.form.status = !!d.status;
           this.form.model = d.model || '';
@@ -103,9 +105,7 @@ export default {
     save() {
       const payload = {
         enabled: this.form.enabled ? 1 : 0,
-        baseUrl: this.form.baseUrl,
-        appId: this.form.appId,
-        apiKey: this.form.apiKey,
+        chatUrl: this.form.chatUrl,
         name: this.form.name,
         status: this.form.status ? 1 : 0,
         model: this.form.model,
@@ -116,8 +116,13 @@ export default {
         growthPolicy: this.form.growthPolicy,
         fallbackText: this.form.fallbackText,
       };
+      if ((this.form.apiKey || '').trim()) {
+        payload.apiKey = this.form.apiKey;
+      }
       saveHomeAgentConfigApi(payload).then(() => {
         this.$message.success('保存成功');
+        this.form.apiKey = '';
+        this.getInfo();
       });
     },
   },

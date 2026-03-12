@@ -105,7 +105,8 @@
 		getForumDrafts,
 		deleteForumPost,
 		deleteForumComment,
-		deleteForumDraft
+		deleteForumDraft,
+		siteConfig
 	} from '@/api/api.js'
 
 	const FORUM_TABS = [{
@@ -162,11 +163,15 @@
 				comments: [],
 				drafts: [],
 				page: 1,
-				limit: 20
+				limit: 20,
+				forumEnabled: true,
+				forumChecked: false
 			}
 		},
 		onShow() {
-			this.loadActive()
+			this.ensureForumEnabled().then((ok) => {
+				if (ok) this.loadActive()
+			})
 		},
 		watch: {
 			active() {
@@ -182,7 +187,30 @@
 			}
 		},
 		methods: {
+			ensureForumEnabled() {
+				if (this.forumChecked) return Promise.resolve(!!this.forumEnabled)
+				return siteConfig().then((res) => {
+					const d = res && res.data ? res.data : {}
+					const enabled = Number(d.forum_enabled || 0) === 1
+					this.forumEnabled = enabled
+					this.forumChecked = true
+					if (!enabled) {
+						uni.redirectTo({
+							url: '/pages/forum/closed'
+						})
+					}
+					return enabled
+				}).catch(() => {
+					this.forumEnabled = false
+					this.forumChecked = true
+					uni.redirectTo({
+						url: '/pages/forum/closed'
+					})
+					return false
+				})
+			},
 			loadActive() {
+				if (!this.forumEnabled) return
 				if (this.active === 'posts') return this.loadMyPosts()
 				if (this.active === 'comments') return this.loadMyComments()
 				return this.loadDrafts()

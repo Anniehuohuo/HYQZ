@@ -39,7 +39,8 @@
 		updateForumPost,
 		getForumDraftDetail,
 		saveForumDraft,
-		deleteForumDraft
+		deleteForumDraft,
+		siteConfig
 	} from '@/api/api.js'
 	const FORUM_TABS = [{
 		key: 'kinder',
@@ -73,19 +74,16 @@
 				tab: 'kinder',
 				tabs: FORUM_TABS,
 				title: '',
-				content: ''
+				content: '',
+				forumEnabled: true,
+				forumChecked: false
 			}
 		},
 		onLoad(options) {
-			const draftId = (options && options.draftId) ? decodeURIComponent(options.draftId) : ''
-			const postId = (options && options.id) ? decodeURIComponent(options.id) : ''
-			if (draftId) {
-				this.loadDraft(draftId)
-				return
-			}
-			if (postId) {
-				this.loadPost(postId)
-			}
+			this.ensureForumEnabled().then((ok) => {
+				if (!ok) return
+				this.initPage(options)
+			})
 		},
 		onUnload() {
 			if (this.draftTimer) clearTimeout(this.draftTimer)
@@ -110,6 +108,39 @@
 			}
 		},
 		methods: {
+			ensureForumEnabled() {
+				if (this.forumChecked) return Promise.resolve(!!this.forumEnabled)
+				return siteConfig().then((res) => {
+					const d = res && res.data ? res.data : {}
+					const enabled = Number(d.forum_enabled || 0) === 1
+					this.forumEnabled = enabled
+					this.forumChecked = true
+					if (!enabled) {
+						uni.redirectTo({
+							url: '/pages/forum/closed'
+						})
+					}
+					return enabled
+				}).catch(() => {
+					this.forumEnabled = false
+					this.forumChecked = true
+					uni.redirectTo({
+						url: '/pages/forum/closed'
+					})
+					return false
+				})
+			},
+			initPage(options) {
+			const draftId = (options && options.draftId) ? decodeURIComponent(options.draftId) : ''
+			const postId = (options && options.id) ? decodeURIComponent(options.id) : ''
+			if (draftId) {
+				this.loadDraft(draftId)
+				return
+			}
+			if (postId) {
+				this.loadPost(postId)
+			}
+			},
 			fingerprintDraft() {
 				const payload = {
 					draftId: this.draftId || '',

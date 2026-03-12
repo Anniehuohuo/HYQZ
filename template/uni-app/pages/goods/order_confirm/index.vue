@@ -488,7 +488,9 @@
 				integral_open: false,
 				jumpData: {},
 				is_gift: 0, // 1 购买的礼品 2领取礼品
-				giftData: null
+				giftData: null,
+				agent_id: 0,
+				agent_title: ''
 			};
 		},
 		computed: mapGetters(['isLogin']),
@@ -530,6 +532,8 @@
 			this.invChecked = options.invoice_id || '';
 			this.header_type = options.header_type || '1';
 			this.couponTitle = options.couponTitle || this.$t(`请选择`)
+			this.agent_id = options.agent_id ? Number(options.agent_id) || 0 : 0;
+			this.agent_title = options.agent_title ? decodeURIComponent(options.agent_title) : '';
 			if (options.invoice_id) {
 				let name = ''
 				name += options.header_type == 1 ? this.$t(`个人`) : this.$t(`企业`);
@@ -1113,6 +1117,9 @@
 				let that = this;
 				orderCreate(that.orderKey, data).then(res => {
 					let url = `/pages/goods/cashier/index?order_id=${res.data.result.orderId}&from_type=order`
+					if (that.agent_id) {
+						url += `&agent_id=${encodeURIComponent(that.agent_id)}&agent_title=${encodeURIComponent(that.agent_title || '')}`
+					}
 					uni.reLaunch({
 						url
 					})

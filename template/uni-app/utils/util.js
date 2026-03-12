@@ -1001,6 +1001,13 @@ export default {
 	 * @param url 跳转路径
 	 */
 	JumpPath: function(url) {
+		if (typeof url === 'string') {
+			url = url.trim();
+			if (url.indexOf('pages/') === 0) url = '/' + url;
+			if (/^\/?pages\/forum\//.test(url)) {
+				url = '/pages/parents_classroom/index';
+			}
+		}
 		let arr = url.split('@APPID=');
 		if (arr.length > 1) {
 			//#ifdef MP
@@ -1030,11 +1037,17 @@ export default {
 					]
 					.indexOf(url) == -1) {
 					uni.navigateTo({
-						url
+						url,
+						fail() {
+							uni.showToast({ title: '页面暂不可用', icon: 'none' });
+						}
 					})
 				} else {
 					uni.switchTab({
-						url
+						url,
+						fail() {
+							uni.showToast({ title: '页面暂不可用', icon: 'none' });
+						}
 					})
 				}
 			}

@@ -299,6 +299,32 @@ export default {
 					// #ifdef H5
 					if (this.is_gift) this.setOpenShare();
 					// #endif
+					if (res.data.paid) {
+						let agentId = 0
+						let agentTitle = ''
+						try {
+							const optAgentId = this.options && this.options.agent_id ? Number(this.options.agent_id) || 0 : 0
+							const optAgentTitle = this.options && this.options.agent_title ? decodeURIComponent(this.options.agent_title) : ''
+							if (optAgentId) {
+								agentId = optAgentId
+								agentTitle = optAgentTitle
+							} else {
+								const key = `AI_ORDER_AGENT_${String(this.orderId)}`
+								const saved = uni.getStorageSync(key) || null
+								if (saved && typeof saved === 'object') {
+									agentId = Number(saved.agent_id) || 0
+									agentTitle = saved.agent_title || ''
+								}
+								uni.removeStorageSync(key)
+							}
+						} catch (e) {}
+						if (agentId) {
+							uni.reLaunch({
+								url: `/pages/ai/chat?agentId=${encodeURIComponent(agentId)}&title=${encodeURIComponent(agentTitle || '对话')}`
+							})
+							return
+						}
+					}
 					this.getOrderCoupon();
 				})
 				.catch((err) => {

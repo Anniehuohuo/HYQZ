@@ -16,18 +16,21 @@ class ForumDraftController
 
     public function lst(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         return app('json')->success($this->services->getDraftList($uid));
     }
 
     public function detail(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         return app('json')->success($this->services->getDraftDetail($uid, (int)$id));
     }
 
     public function save(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $data = $request->postMore([
             ['id', 0],
@@ -42,6 +45,7 @@ class ForumDraftController
 
     public function delete(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $this->services->deleteDraft($uid, (int)$id);
         return app('json')->success();

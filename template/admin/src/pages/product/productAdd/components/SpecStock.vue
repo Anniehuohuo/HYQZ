@@ -362,7 +362,7 @@
                       "
                       v-db-click
                       @click="addVirtual(scope.$index, 'manyFormValidate')"
-                      >添加卡密</el-button
+                      >添加网盘信息</el-button
                     >
                     <span
                       class="see"
@@ -512,7 +512,7 @@
 
       <el-col :span="24">
         <el-form-item
-          :label="formValidate.virtual_type == 1 ? '添加卡密/网盘：' : '选择优惠券：'"
+          :label="formValidate.virtual_type == 1 ? '添加网盘/提取码：' : '选择优惠券：'"
           v-if="formValidate.virtual_type == 1 || formValidate.virtual_type == 2"
         >
           <el-button
@@ -534,7 +534,7 @@
             "
             v-db-click
             @click="addVirtual(0, 'oneFormValidate')"
-            >添加卡密</el-button
+            >添加网盘信息</el-button
           >
           <span
             class="see"

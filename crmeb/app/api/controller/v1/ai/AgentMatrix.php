@@ -2,6 +2,7 @@
 
 namespace app\api\controller\v1\ai;
 
+use app\Request;
 use app\services\ai\AiAgentMatrixServices;
 
 class AgentMatrix
@@ -13,9 +14,10 @@ class AgentMatrix
         $this->services = $services;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return app('json')->success($this->services->getEnabledMatrix());
+        $uid = (int)$request->uid();
+        return app('json')->success($this->services->getEnabledMatrix($uid));
     }
 }
 

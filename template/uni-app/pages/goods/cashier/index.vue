@@ -109,7 +109,9 @@
 				},
 				formContent: '',
 				oid: 0,
-				is_gift: 0
+				is_gift: 0,
+				agent_id: 0,
+				agent_title: ''
 			}
 		},
 		watch: {
@@ -135,6 +137,16 @@
 		onLoad(options) {
 			if (options.order_id) this.orderId = options.order_id
 			if (options.from_type) this.fromType = options.from_type
+			this.agent_id = options.agent_id ? Number(options.agent_id) || 0 : 0
+			this.agent_title = options.agent_title ? decodeURIComponent(options.agent_title) : ''
+			if (this.agent_id && this.orderId) {
+				try {
+					uni.setStorageSync(`AI_ORDER_AGENT_${String(this.orderId)}`, {
+						agent_id: this.agent_id,
+						agent_title: this.agent_title
+					})
+				} catch (e) {}
+			}
 			this.getBasicConfig()
 		},
 		onShow() {

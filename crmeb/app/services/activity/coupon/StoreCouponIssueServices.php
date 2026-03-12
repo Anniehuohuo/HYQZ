@@ -22,6 +22,7 @@ use app\services\user\member\MemberRightServices;
 use app\services\user\UserServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
+use crmeb\services\CacheService;
 use crmeb\services\FormBuilder;
 use think\facade\Db;
 
@@ -237,6 +238,24 @@ class StoreCouponIssueServices extends BaseServices
             return true;
         }
         return false;
+    }
+
+    public function removeFromNewGiftConfig(int $couponId): void
+    {
+        $couponId = (int)$couponId;
+        if ($couponId <= 0) return;
+        try {
+            $value = Db::name('system_config')->where('menu_name', 'reward_coupon')->value('value');
+            $arr = json_decode((string)$value, true);
+            if (!is_array($arr) || !$arr) return;
+            $newArr = array_values(array_filter($arr, function ($item) use ($couponId) {
+                return (int)($item['id'] ?? 0) !== $couponId;
+            }));
+            if (count($newArr) === count($arr)) return;
+            Db::name('system_config')->where('menu_name', 'reward_coupon')->update(['value' => json_encode($newArr)]);
+            CacheService::clear();
+        } catch (\Throwable $e) {
+        }
     }
 
     /**

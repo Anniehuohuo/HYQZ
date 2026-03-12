@@ -24,6 +24,7 @@ class ForumPostController
 
     public function index(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = 0;
         try {
             $uid = (int)$request->uid();
@@ -54,6 +55,7 @@ class ForumPostController
 
     public function detail(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = 0;
         try {
             $uid = (int)$request->uid();
@@ -71,6 +73,7 @@ class ForumPostController
 
     public function create(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $data = $request->postMore([
             ['tab', ''],
@@ -83,6 +86,7 @@ class ForumPostController
 
     public function update(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $postId = (int)$id;
         $data = $request->postMore([
@@ -96,6 +100,7 @@ class ForumPostController
 
     public function delete(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $postId = (int)$id;
         $this->services->deletePost($uid, $postId);
@@ -104,6 +109,7 @@ class ForumPostController
 
     public function toggleLike(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $postId = (int)$id;
         $this->services->ensurePostExists($postId);
@@ -114,12 +120,14 @@ class ForumPostController
 
     public function edit(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         return app('json')->success($this->services->getEditPost($uid, (int)$id));
     }
 
     public function my(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         return app('json')->success($this->services->getMyPosts($uid));
     }

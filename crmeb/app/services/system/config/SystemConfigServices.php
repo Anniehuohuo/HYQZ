@@ -107,6 +107,7 @@ class SystemConfigServices extends BaseServices
                 'spread_banner' => '',
                 'brokerage_level' => '',
                 'division_status' => '',
+                'division_spread_commission_open' => '',
                 'agent_apply_open' => '',
                 'brokerage_window_switch' => '',
             ],
@@ -1015,6 +1016,7 @@ class SystemConfigServices extends BaseServices
         /** @var SystemConfigTabServices $service */
         $service = app()->make(SystemConfigTabServices::class);
         $title = $service->value(['id' => $tabId], 'title');
+        $this->ensureDivisionToggleConfig($tabId);
         $list = $this->dao->getConfigTabAllList($tabId);
         $formbuider = $this->createForm($list);
         $name = 'setting';
@@ -1023,6 +1025,83 @@ class SystemConfigServices extends BaseServices
         }
         $postUrl = $this->postUrl[$name]['url'] ?? '/setting/config/save_basics';
         return create_form($title, $formbuider, $this->url($postUrl), 'POST');
+    }
+
+    protected function ensureDivisionToggleConfig(int $tabId): void
+    {
+        if (!in_array($tabId, [72, 73, 74, 9], true)) {
+            return;
+        }
+
+        try {
+            $targetTabId = 72;
+            $brokerageFuncId = (int)$this->dao->search(['menu_name' => 'brokerage_func_status'])->value('id');
+
+            $divisionId = (int)$this->dao->search(['menu_name' => 'division_status'])->value('id');
+            if ($divisionId) {
+                $currentTabId = (int)$this->dao->search(['menu_name' => 'division_status'])->value('config_tab_id');
+                if ($currentTabId !== $targetTabId) {
+                    $this->dao->search(['menu_name' => 'division_status'])->update(['config_tab_id' => $targetTabId, 'status' => 1]);
+                    CacheService::clear();
+                }
+            } else {
+                $data = [
+                    'menu_name' => 'division_status',
+                    'type' => 'radio',
+                    'input_type' => 'input',
+                    'config_tab_id' => $targetTabId,
+                    'parameter' => "1=>开启\n0=>关闭",
+                    'upload_type' => 0,
+                    'required' => '',
+                    'width' => 0,
+                    'high' => 0,
+                    'value' => json_encode(1),
+                    'info' => '事业部/代理总开关',
+                    'desc' => '控制事业部/代理功能的开启与关闭',
+                    'sort' => 97,
+                    'status' => 1,
+                    'level' => $brokerageFuncId > 0 ? 1 : 0,
+                    'link_id' => $brokerageFuncId > 0 ? $brokerageFuncId : 0,
+                    'link_value' => $brokerageFuncId > 0 ? 1 : 0,
+                ];
+                $this->save($data);
+                CacheService::clear();
+                $divisionId = (int)$this->dao->search(['menu_name' => 'division_status'])->value('id');
+            }
+
+            $spreadOpenId = (int)$this->dao->search(['menu_name' => 'division_spread_commission_open'])->value('id');
+            $spreadLinkId = $divisionId > 0 ? $divisionId : $brokerageFuncId;
+            if ($spreadOpenId) {
+                $currentTabId = (int)$this->dao->search(['menu_name' => 'division_spread_commission_open'])->value('config_tab_id');
+                if ($currentTabId !== $targetTabId) {
+                    $this->dao->search(['menu_name' => 'division_spread_commission_open'])->update(['config_tab_id' => $targetTabId, 'status' => 1]);
+                    CacheService::clear();
+                }
+            } else {
+                $data = [
+                    'menu_name' => 'division_spread_commission_open',
+                    'type' => 'radio',
+                    'input_type' => 'input',
+                    'config_tab_id' => $targetTabId,
+                    'parameter' => "1=>开启\n0=>关闭",
+                    'upload_type' => 0,
+                    'required' => '',
+                    'width' => 0,
+                    'high' => 0,
+                    'value' => json_encode(1),
+                    'info' => '代理叠加分销佣金',
+                    'desc' => '代理/员工/事业部直推时，是否仍计算一级分销佣金（叠加）',
+                    'sort' => 96,
+                    'status' => 1,
+                    'level' => $spreadLinkId > 0 ? 1 : 0,
+                    'link_id' => $spreadLinkId > 0 ? $spreadLinkId : 0,
+                    'link_value' => $spreadLinkId > 0 ? 1 : 0,
+                ];
+                $this->save($data);
+                CacheService::clear();
+            }
+        } catch (\Throwable $e) {
+        }
     }
 
     /**

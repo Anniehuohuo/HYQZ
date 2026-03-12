@@ -3,6 +3,11 @@ use think\facade\Route;
 
 Route::group('forum', function () {
     Route::group(function () {
+        Route::get('config', 'v1.forum.ForumConfig/read')->option(['real_name' => '论坛开关读取']);
+        Route::post('config', 'v1.forum.ForumConfig/save')->option(['real_name' => '论坛开关保存']);
+    })->option(['parent' => 'forum', 'cate_name' => '配置']);
+
+    Route::group(function () {
         Route::get('post', 'v1.forum.ForumPost/index')->option(['real_name' => '论坛帖子列表']);
         Route::delete('post/:id', 'v1.forum.ForumPost/delete')->option(['real_name' => '删除论坛帖子']);
     })->option(['parent' => 'forum', 'cate_name' => '帖子管理']);

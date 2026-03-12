@@ -16,6 +16,7 @@ use app\services\activity\coupon\StoreCouponIssueServices;
 use app\services\activity\integral\StoreIntegralOrderServices;
 use app\services\BaseServices;
 use app\dao\order\StoreOrderDao;
+use app\services\ai\AiAgentGoodsServices;
 use app\services\message\MessageSystemServices;
 use app\services\product\sku\StoreProductAttrValueServices;
 use app\services\product\sku\StoreProductVirtualServices;
@@ -726,6 +727,29 @@ if ($type == 'order') {
         if ($orderInfo['virtual_type'] == 1) {
             /** @var StoreOrderServices $orderService */
             $orderService = app()->make(StoreOrderServices::class);
+            $firstProductId = 0;
+            try {
+                $firstProductId = (int)($orderInfo['cart_info'][$orderInfo['cart_id'][0]]['cart_info']['productInfo']['id'] ?? 0);
+            } catch (\Throwable $e) {
+                $firstProductId = 0;
+            }
+            if ($firstProductId > 0) {
+                try {
+                    /** @var AiAgentGoodsServices $aiAgentGoodsServices */
+                    $aiAgentGoodsServices = app()->make(AiAgentGoodsServices::class);
+                    if ($aiAgentGoodsServices->isUnlockProductId($firstProductId)) {
+                        $orderService->update(['id' => $orderInfo['id']], ['status' => 1, 'delivery_type' => 'fictitious', 'virtual_info' => '', 'remark' => '智能体解锁权益已发放']);
+                        $statusService->save([
+                            'oid' => $orderInfo['id'],
+                            'change_type' => 'delivery_fictitious',
+                            'change_message' => '智能体解锁自动发货',
+                            'change_time' => time()
+                        ]);
+                        return;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
             $sku = $orderInfo['cart_info'][$orderInfo['cart_id'][0]]['cart_info']['productInfo']['attrInfo']['suk'];
             if ($activityStatus) {
                 $product_id = $orderInfo['cart_info'][$orderInfo['cart_id'][0]]['cart_info']['productInfo']['product_id'];
@@ -736,11 +760,11 @@ if ($type == 'order') {
                 $disk_info = $orderInfo['cart_info'][$orderInfo['cart_id'][0]]['cart_info']['productInfo']['attrInfo']['disk_info'];
             }
             if ($disk_info != '') {
-                $orderService->update(['id' => $orderInfo['id']], ['status' => 1, 'delivery_type' => 'fictitious', 'virtual_info' => $disk_info, 'remark' => '密钥自动发放：' . $disk_info]);
+                $orderService->update(['id' => $orderInfo['id']], ['status' => 1, 'delivery_type' => 'fictitious', 'virtual_info' => $disk_info, 'remark' => '网盘信息自动发放：' . $disk_info]);
                 $this->SystemSend($orderInfo['uid'], [
                     'mark' => 'virtual_info',
-                    'title' => '虚拟密钥发放',
-                    'content' => '您购买的密钥商品已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号：' . $orderInfo['order_id'] . '，密钥：' . $disk_info . '，感谢您的光临！'
+                    'title' => '网盘信息发放',
+                    'content' => '您购买的网盘课件已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号：' . $orderInfo['order_id'] . '，网盘信息：' . $disk_info . '，感谢您的光临！'
                 ]);
             } else {
                 if ($activityStatus) {
@@ -758,17 +782,17 @@ if ($type == 'order') {
                 $virtual->order_id = $orderInfo['order_id'];
                 $virtual->uid = $orderInfo['uid'];
                 $virtual->save();
-                $orderService->update(['id' => $orderInfo['id']], ['status' => 1, 'delivery_type' => 'fictitious', 'virtual_info' => $virtual->card_unique, 'remark' => '卡密已自动发放，卡号：' . $virtual->card_no . '；密码：' . $virtual->card_pwd]);
+                $orderService->update(['id' => $orderInfo['id']], ['status' => 1, 'delivery_type' => 'fictitious', 'virtual_info' => $virtual->card_unique, 'remark' => '网盘信息已自动发放，链接：' . $virtual->card_no . '；提取码：' . $virtual->card_pwd]);
                 $this->SystemSend($orderInfo['uid'], [
                     'mark' => 'virtual_info',
-                    'title' => '虚拟卡密发放',
-                    'content' => '您购买的卡密商品已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号：' . $orderInfo['order_id'] . '，卡号：' . $virtual->card_no . '；密码：' . $virtual->card_pwd . '，感谢您的光临！'
+                    'title' => '网盘信息发放',
+                    'content' => '您购买的网盘课件已支付成功，支付金额' . $orderInfo['pay_price'] . '元，订单号：' . $orderInfo['order_id'] . '，链接：' . $virtual->card_no . '；提取码：' . $virtual->card_pwd . '，感谢您的光临！'
                 ]);
             }
             $statusService->save([
                 'oid' => $orderInfo['id'],
                 'change_type' => 'delivery_fictitious',
-                'change_message' => '卡密自动发货',
+                'change_message' => '网盘信息自动发货',
                 'change_time' => time()
             ]);
         } elseif ($orderInfo['virtual_type'] == 2) {
@@ -807,7 +831,7 @@ if ($type == 'order') {
             MiniOrderJob::dispatchSecs(10, 'doJob', [
                 $orderInfo['order_id'],
                 3,
-                [['item_desc' => $orderInfo['virtual_type'] == 1 ? '卡密自动发货' : '优惠券自动发货']],
+                [['item_desc' => $orderInfo['virtual_type'] == 1 ? '网盘信息自动发货' : '优惠券自动发货']],
                 app()->make(WechatUserServices::class)->uidToOpenid($orderInfo['uid'], 'routine'),
                 'pages/goods/order_details/index?order_id=' . $orderInfo['order_id']
             ]);

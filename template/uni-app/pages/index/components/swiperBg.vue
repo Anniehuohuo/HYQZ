@@ -5,14 +5,13 @@
 			<view class="colorBg" :style="[colorBgStyle]"></view>
 			<view class="swiper">
 				<swiper :style="'height:'+ imageH +'rpx;'" :autoplay="true" :previous-margin="swiperMargin" :next-margin="swiperMargin" :circular="circular" :interval="interval" :duration="duration"
-					@change="bannerfun" v-if="imageH">
+					@change="bannerfun">
 					<swiper-item v-for="(item,index) in dataConfig.swiperConfig.list" :key="index">
 						<view @click="goDetail(item)" class="swiper-item" :style="[itemStyle,active == index?activeStyle:'']">
 							<image :src="item.img" mode="aspectFill" class="image" :style="[imageStyle]"></image>
 						</view>
 					</swiper-item>
 				</swiper>
-				<view class="noPic" v-else>{{ $t(`图片加载中`) }}...</view>
 				<view class="dot acea-row" :style="[dotStyle]">
 					<view class="progress" v-if="dataConfig.docConfig.tabVal == 2" :style="[progressWidth,dotItemStyle]">
 						<view class="inner" :style="[progressValue,dotItemActiveStyle]"></view>
@@ -143,42 +142,52 @@
 			},
 		},
 		watch: {
-			imageH(nVal, oVal) {
-				let self = this
-				this.imageH = nVal
-			},
+			'dataConfig.swiperConfig.list': {
+				handler(list) {
+					const nextList = Array.isArray(list) ? list : [];
+					this.imgUrls = nextList;
+					this.recalcImageHeight(nextList);
+				},
+				immediate: true,
+				deep: true
+			}
 		},
 		created() {
 			this.imgUrls = this.dataConfig.swiperConfig.list
 			if (this.dataConfig.styleConfig.tabVal == 2) {
 				this.swiperMargin = '55rpx';
 			}
+			this.imageH = 375;
 		},
 		mounted() {
-			if (this.imgUrls.length) {
-				let that = this;
-				this.$nextTick((e) => {
-					uni.getImageInfo({
-						src: that.setDomain(that.imgUrls[0].img),
-						success: (res) => {
-							if (res && res.height > 0) {
-								// that.$set(that, 'imageH',
-								// 	res.height / res
-								// 	.width * 750)
-								let height = res.height * ((750 - this.dataConfig.prConfig.val * 4) / res.width)
-								that.$set(that, 'imageH', height);
-							} else {
-								that.$set(that, 'imageH', 375);
-							}
-						},
-						fail: function(error) {
-							that.$set(that, 'imageH', 375);
-						}
-					})
-				})
-			}
 		},
 		methods: {
+			recalcImageHeight(list) {
+				const nextList = Array.isArray(list) ? list : [];
+				const first = nextList[0];
+				if (!first || !first.img) {
+					this.imageH = 375;
+					return;
+				}
+
+				this.$nextTick(() => {
+					uni.getImageInfo({
+						src: this.setDomain(first.img),
+						success: (res) => {
+							if (res && res.width > 0 && res.height > 0) {
+								const prVal = this.dataConfig && this.dataConfig.prConfig ? Number(this.dataConfig.prConfig.val || 0) : 0;
+								const height = res.height * ((750 - prVal * 4) / res.width);
+								this.imageH = height > 0 ? height : 375;
+							} else {
+								this.imageH = 375;
+							}
+						},
+						fail: () => {
+							this.imageH = 375;
+						}
+					});
+				});
+			},
 			bannerfun(e) {
 				this.active = e.detail.current;
 				this.current = e.detail.current + 1;

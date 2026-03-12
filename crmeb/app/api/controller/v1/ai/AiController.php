@@ -3,16 +3,23 @@
 namespace app\api\controller\v1\ai;
 
 use app\Request;
+use app\services\ai\AiAgentGoodsServices;
 use app\services\ai\AiChatServices;
+use app\services\ai\AiPowerServices;
 use crmeb\services\CacheService;
+use think\facade\Log;
 
 class AiController
 {
     protected AiChatServices $aiChatServices;
+    protected AiPowerServices $aiPowerServices;
+    protected AiAgentGoodsServices $aiAgentGoodsServices;
 
-    public function __construct(AiChatServices $aiChatServices)
+    public function __construct(AiChatServices $aiChatServices, AiPowerServices $aiPowerServices, AiAgentGoodsServices $aiAgentGoodsServices)
     {
         $this->aiChatServices = $aiChatServices;
+        $this->aiPowerServices = $aiPowerServices;
+        $this->aiAgentGoodsServices = $aiAgentGoodsServices;
     }
 
     public function chat(Request $request)
@@ -25,9 +32,10 @@ class AiController
         $data = $request->postMore([
             ['message', ''],
             ['conversation_id', ''], // Keep for backward compatibility if needed
-            ['agent_id', 0], // Changed default to 0
+            ['agent_id', ''], // Allow non-numeric to fallback home agent
             ['session_id', 0],
-            ['stream', false],
+            ['stream', true],
+            ['format', 'text'],
         ]);
 
         $message = trim((string)$data['message']);
@@ -35,37 +43,154 @@ class AiController
             return app('json')->fail('请输入内容');
         }
 
-        $agentId = (int)$data['agent_id'];
-        
-        // Use new ChatStream if agentId is provided (Matrix Chat)
-        // If agentId is 0, we also return stream error to prevent frontend spinning
-        $sessionId = (int)$data['session_id'];
-        @ini_set('zlib.output_compression', '0');
-        @ini_set('output_buffering', 'off');
-        while (ob_get_level() > 0) {
-            @ob_end_flush();
+        $agentIdRaw = trim((string)($data['agent_id'] ?? ''));
+        $sessionId = (int)($data['session_id'] ?? 0);
+        $stream = (int)($data['stream'] ?? 1) === 1;
+        $format = trim((string)($data['format'] ?? 'text'));
+        if ($format === '') $format = 'text';
+
+        $isNumericAgent = $agentIdRaw !== '' && ctype_digit($agentIdRaw) && (int)$agentIdRaw > 0;
+        $agentId = $isNumericAgent ? (int)$agentIdRaw : 0;
+
+        $powerToken = '';
+        $powerCheck = null;
+        if ($isNumericAgent) {
+            $access = $this->aiAgentGoodsServices->ensureUnlocked($uid, $agentId);
+            if (!($access['unlocked'] ?? false)) {
+                return app('json')->fail('未解锁，请先购买', [
+                    'need_purchase' => 1,
+                    'product_id' => (int)($access['product_id'] ?? 0),
+                    'agent_id' => $agentId,
+                ]);
+            }
+            $powerCheck = $this->aiPowerServices->prepareChat($uid, $agentId, (string)$sessionId);
+            if (!($powerCheck['allowed'] ?? false)) {
+                return app('json')->fail('今日免费次数已用完，请充值算力', [
+                    'need_recharge' => 1,
+                    'quota' => $powerCheck['quota'] ?? [],
+                ]);
+            }
+            $powerToken = (string)($powerCheck['token'] ?? '');
         }
 
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
-        header('Connection: keep-alive');
-        header('X-Accel-Buffering: no');
+        Log::info('api.ai.chat.request', [
+            'uid' => $uid,
+            'ip' => (string)($request->ip() ?? ''),
+            'route' => (string)$request->baseUrl(),
+            'stream' => $stream ? 1 : 0,
+            'agentIdRaw' => $agentIdRaw,
+            'agentId' => $agentId,
+            'sessionId' => $sessionId,
+            'messageLen' => mb_strlen($message),
+        ]);
 
-        if ($agentId <= 0) {
-            echo "data: " . json_encode(['error' => '请先选择一个智能体'], JSON_UNESCAPED_UNICODE) . "\n\n";
-            echo "data: [DONE]\n\n";
+        if ($stream) {
+            @ini_set('zlib.output_compression', '0');
+            @ini_set('output_buffering', 'off');
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+
+            header('Content-Type: text/event-stream');
+            header('Cache-Control: no-cache');
+            header('Connection: keep-alive');
+            header('X-Accel-Buffering: no');
+
+            if ($isNumericAgent) {
+                $generator = $this->aiChatServices->chatStream($uid, $agentId, $message, $sessionId ?: null, $format);
+            } else {
+                $generator = $this->aiChatServices->homeChatStream($message);
+            }
+
+            $committed = false;
+            foreach ($generator as $chunk) {
+                if ($isNumericAgent && !$committed && $powerToken !== '') {
+                    $lines = preg_split("/\r?\n/", (string)$chunk) ?: [];
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if ($line === '' || strpos($line, 'data:') !== 0) continue;
+                        $dataStr = trim(substr($line, 5));
+                        if ($dataStr === '' || $dataStr === '[DONE]') continue;
+                        $payload = json_decode($dataStr, true);
+                        if (!is_array($payload)) continue;
+                        if (!empty($payload['content'])) {
+                            $ok = $this->aiPowerServices->commitChat($powerToken);
+                            if (!$ok) {
+                                echo "data: " . json_encode(['error' => '算力不足，请充值后继续'], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                echo "data: [DONE]\n\n";
+                                if (ob_get_level() > 0) {
+                                    @ob_flush();
+                                }
+                                flush();
+                                exit;
+                            }
+                            $committed = true;
+                            break;
+                        }
+                    }
+                }
+                echo $chunk;
+                if (ob_get_level() > 0) {
+                    @ob_flush();
+                }
+                flush();
+            }
             exit;
         }
 
-        $generator = $this->aiChatServices->chatStream($uid, $agentId, $message, $sessionId ?: null);
-        foreach ($generator as $chunk) {
-            echo $chunk;
-            if (ob_get_level() > 0) {
-                @ob_flush();
+        if ($isNumericAgent) {
+            $reply = '';
+            $newSessionId = $sessionId;
+            $generator = $this->aiChatServices->chatStream($uid, $agentId, $message, $sessionId ?: null);
+            $committed = false;
+            foreach ($generator as $chunk) {
+                $lines = preg_split("/\r?\n/", (string)$chunk) ?: [];
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if ($line === '' || strpos($line, 'data:') !== 0) {
+                        continue;
+                    }
+                    $dataStr = trim(substr($line, 5));
+                    if ($dataStr === '[DONE]') {
+                        continue;
+                    }
+                    $payload = json_decode($dataStr, true);
+                    if (!is_array($payload)) {
+                        continue;
+                    }
+                    if (!empty($payload['error'])) {
+                        return app('json')->fail((string)$payload['error']);
+                    }
+                    if (!empty($payload['session_id'])) {
+                        $newSessionId = (int)$payload['session_id'];
+                    }
+                    if (!empty($payload['content'])) {
+                        if (!$committed && $powerToken !== '') {
+                            $ok = $this->aiPowerServices->commitChat($powerToken);
+                            if (!$ok) {
+                                return app('json')->fail('算力不足，请充值后继续', [
+                                    'need_recharge' => 1,
+                                    'quota' => $powerCheck['quota'] ?? [],
+                                ]);
+                            }
+                            $committed = true;
+                        }
+                        $reply .= (string)$payload['content'];
+                    }
+                }
             }
-            flush();
+            $reply = trim($reply);
+            if ($reply === '') {
+                return app('json')->fail('服务繁忙，请稍后再试');
+            }
+            return app('json')->success(['reply' => $reply, 'session_id' => $newSessionId]);
         }
-        exit;
+
+        $result = $this->aiChatServices->homeChat($message);
+        if (!($result['ok'] ?? false)) {
+            return app('json')->fail((string)($result['reply'] ?? '服务繁忙，请稍后再试'));
+        }
+        return app('json')->success(['reply' => (string)$result['reply']]);
 
         /* Old logic fallback removed/commented out to enforce stream consistency
         $ip = (string)($request->ip() ?? '');
@@ -126,5 +251,22 @@ class AiController
         $session = $this->aiChatServices->getRecentSession($uid, $agentId);
         return app('json')->success($session ?: []);
     }
-}
 
+    public function clearHistory(Request $request)
+    {
+        $uid = (int)$request->uid();
+        if (!$uid) {
+            return app('json')->fail('请先登录');
+        }
+        [$sessionId, $agentId] = $request->postMore([
+            ['session_id', 0],
+            ['agent_id', 0],
+        ], true);
+        $sessionId = (int)$sessionId;
+        $agentId = (int)$agentId;
+        if ($sessionId <= 0 && $agentId <= 0) return app('json')->fail('参数错误');
+        $ok = $this->aiChatServices->clearChatHistory($uid, $sessionId, $agentId);
+        if (!$ok) return app('json')->fail('清空失败');
+        return app('json')->success(['ok' => 1]);
+    }
+}

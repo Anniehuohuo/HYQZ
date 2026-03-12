@@ -219,17 +219,8 @@ class LuckLotteryRecordServices extends BaseServices
                                 bcmul($prize['num'], '100', 0),
                                 '抽奖活动红包中奖',
                                 sys_config('site_url') . '/api/transfer/notify/' . $type,
-                                '劳务报酬',
-                                [
-                                    [
-                                        'info_type' => '岗位类型',
-                                        'info_content' => '抽奖'
-                                    ],
-                                    [
-                                        'info_type' => '报酬说明',
-                                        'info_content' => '抽奖活动红包中奖'
-                                    ],
-                                ]
+                                '',
+                                []
                             );
                             $this->dao->update($lottery_record_id, [
                                 'wechat_order_id' => $wechat_order_id,

@@ -15,7 +15,7 @@ return [
     //上传文件大小
     'filesize' => 2097152,
     //上传文件后缀类型
-    'fileExt' => ['jpg', 'jpeg', 'png', 'gif', 'pem', 'mp3', 'wma', 'wav', 'amr', 'mp4', 'key', 'xlsx', 'xls', 'txt', 'ico', 'crt', 'webp'],
+    'fileExt' => ['jpg', 'jpeg', 'png', 'gif', 'pem', 'mp3', 'wma', 'wav', 'amr', 'mp4', 'key', 'xlsx', 'xls', 'txt', 'md', 'csv', 'json', 'log', 'doc', 'docx', 'ico', 'crt', 'webp'],
     //上传文件类型
     'fileMime' => [
         'image/jpg',
@@ -23,6 +23,9 @@ return [
         'image/gif',
         'image/png',
         'text/plain',
+        'text/markdown',
+        'text/csv',
+        'application/json',
         'audio/mpeg',
         'video/mp4',
         'application/octet-stream',
@@ -30,6 +33,8 @@ return [
         'application/vnd.ms-works',
         'application/vnd.ms-excel',
         'application/zip',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel',
         'application/vnd.ms-excel',
         'text/xml',

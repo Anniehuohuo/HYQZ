@@ -197,6 +197,8 @@ class DivisionServices extends BaseServices
                 $adminInfo->real_name = $adminData['real_name'];
                 $adminInfo->account = $adminData['account'];
                 $adminInfo->roles = implode(',', $adminData['roles']);
+                $adminInfo->level = 1;
+                $adminInfo->division_id = $uid;
                 if ($adminInfo->save())
                     return true;
                 else
@@ -491,6 +493,7 @@ class DivisionServices extends BaseServices
     public function getDivisionPercent($uid, $storeBrokerageRatio, $storeBrokerageRatioTwo, $isSelfBrokerage)
     {
         $division_open = (int)sys_config('division_status', 1);
+        $spreadCommissionOpen = (int)sys_config('division_spread_commission_open', 1);
         if (!$division_open) {
             /** 代理商关闭 */
             $storeBrokerageOne = $storeBrokerageRatio;
@@ -508,7 +511,7 @@ class DivisionServices extends BaseServices
                 $storeBrokerageTwo = 0;
                 $staffPercent = 0;
                 $agentPercent = 0;
-                if ($userInfo['division_status'] == 1 && $userInfo['division_end_time'] > time()) {
+                if ($userInfo['division_status'] == 1 && (!$userInfo['division_end_time'] || $userInfo['division_end_time'] > time())) {
                     $divisionPercent = $isSelfBrokerage ? $userInfo['division_percent'] : 0;
                 } else {
                     $divisionPercent = 0;
@@ -519,12 +522,12 @@ class DivisionServices extends BaseServices
                 $storeBrokerageOne = 0;
                 $storeBrokerageTwo = 0;
                 $staffPercent = 0;
-                if ($userInfo['division_status'] == 1 && $userInfo['division_end_time'] > time()) {
+                if ($userInfo['division_status'] == 1 && (!$userInfo['division_end_time'] || $userInfo['division_end_time'] > time())) {
                     $agentPercent = $isSelfBrokerage ? $userInfo['division_percent'] : 0;
                 } else {
                     $agentPercent = 0;
                 }
-                if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
+                if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
                     $divisionPercent = bcsub($divisionInfo['division_percent'], $agentPercent, 2);
                     $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                 } else {
@@ -536,18 +539,18 @@ class DivisionServices extends BaseServices
                 $divisionInfo = $userServices->get($userInfo['division_id']);
                 $storeBrokerageOne = 0;
                 $storeBrokerageTwo = 0;
-                if ($userInfo['division_status'] == 1 && $userInfo['division_end_time'] > time()) {
+                if ($userInfo['division_status'] == 1 && (!$userInfo['division_end_time'] || $userInfo['division_end_time'] > time())) {
                     $staffPercent = $isSelfBrokerage ? $userInfo['division_percent'] : 0;
                 } else {
                     $staffPercent = 0;
                 }
-                if ($agentInfo['division_status'] == 1 && $agentInfo['division_end_time'] > time()) {
+                if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
                     $agentPercent = bcsub($agentInfo['division_percent'], $staffPercent, 2);
                     $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
                 } else {
                     $agentPercent = 0;
                 }
-                if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
+                if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
                     $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd($staffPercent, $agentPercent, 2), 2);
                     $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                 } else {
@@ -562,43 +565,63 @@ class DivisionServices extends BaseServices
                     /** 该用户为员工推广 */
                     if ($userInfo['staff_id'] == $userInfo['spread_uid']) {
                         /** 员工直接下级 */
-                        $storeBrokerageOne = $isSelfBrokerage ? $storeBrokerageRatio : 0;
+                        $storeBrokerageOne = $spreadCommissionOpen ? $storeBrokerageRatio : ($isSelfBrokerage ? $storeBrokerageRatio : 0);
                         $storeBrokerageTwo = 0;
-                        if ($staffInfo['division_status'] == 1 && $staffInfo['division_end_time'] > time()) {
-                            $staffPercent = bcsub($staffInfo['division_percent'], $storeBrokerageOne, 2);
-                            $staffPercent = $staffPercent < 0 ? 0 : $staffPercent;
+                        if ($spreadCommissionOpen) {
+                            if ($staffInfo['division_status'] == 1 && (!$staffInfo['division_end_time'] || $staffInfo['division_end_time'] > time())) {
+                                $staffPercent = $staffInfo['division_percent'];
+                            } else {
+                                $staffPercent = 0;
+                            }
+                            if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
+                                $agentPercent = bcsub($agentInfo['division_percent'], $staffPercent, 2);
+                                $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
+                            } else {
+                                $agentPercent = 0;
+                            }
+                            if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
+                                $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd($staffPercent, $agentPercent, 2), 2);
+                                $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
+                            } else {
+                                $divisionPercent = 0;
+                            }
                         } else {
-                            $staffPercent = 0;
-                        }
-                        if ($agentInfo['division_status'] == 1 && $agentInfo['division_end_time'] > time()) {
-                            $agentPercent = bcsub($agentInfo['division_percent'], bcadd($storeBrokerageOne, $staffPercent, 2), 2);
-                            $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
-                        } else {
-                            $agentPercent = 0;
-                        }
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
-                            $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd(bcadd($storeBrokerageOne, $staffPercent, 2), $agentPercent, 2), 2);
-                            $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
-                        } else {
-                            $divisionPercent = 0;
+                            if ($staffInfo['division_status'] == 1 && (!$staffInfo['division_end_time'] || $staffInfo['division_end_time'] > time())) {
+                                $staffPercent = bcsub($staffInfo['division_percent'], $storeBrokerageOne, 2);
+                                $staffPercent = $staffPercent < 0 ? 0 : $staffPercent;
+                            } else {
+                                $staffPercent = 0;
+                            }
+                            if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
+                                $agentPercent = bcsub($agentInfo['division_percent'], bcadd($storeBrokerageOne, $staffPercent, 2), 2);
+                                $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
+                            } else {
+                                $agentPercent = 0;
+                            }
+                            if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
+                                $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd(bcadd($storeBrokerageOne, $staffPercent, 2), $agentPercent, 2), 2);
+                                $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
+                            } else {
+                                $divisionPercent = 0;
+                            }
                         }
                     } else {
                         $storeBrokerageOne = $storeBrokerageRatio;
                         $storeBrokerageTwo = $userServices->value(['uid' => $userInfo['spread_uid']], 'spread_uid') == $userInfo['staff_id'] && !$isSelfBrokerage ? 0 : $storeBrokerageRatioTwo;
                         $brokerageOneTwo = bcadd($storeBrokerageOne, $storeBrokerageTwo, 2);
-                        if ($staffInfo['division_status'] == 1 && $staffInfo['division_end_time'] > time()) {
+                        if ($staffInfo['division_status'] == 1 && (!$staffInfo['division_end_time'] || $staffInfo['division_end_time'] > time())) {
                             $staffPercent = bcsub($staffInfo['division_percent'], $brokerageOneTwo, 2);
                             $staffPercent = $staffPercent < 0 ? 0 : $staffPercent;
                         } else {
                             $staffPercent = 0;
                         }
-                        if ($agentInfo['division_status'] == 1 && $agentInfo['division_end_time'] > time()) {
+                        if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
                             $agentPercent = bcsub($agentInfo['division_percent'], bcadd($brokerageOneTwo, $staffPercent, 2), 2);
                             $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
                         } else {
                             $agentPercent = 0;
                         }
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
+                        if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
                             $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd(bcadd($brokerageOneTwo, $staffPercent, 2), $agentPercent, 2), 2);
                             $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                         } else {
@@ -608,33 +631,47 @@ class DivisionServices extends BaseServices
                 } elseif ($userInfo['agent_id']) {
                     /** 该用户为代理商推广 */
                     if ($userInfo['agent_id'] == $userInfo['spread_uid']) {
-                        $storeBrokerageOne = $isSelfBrokerage ? $storeBrokerageRatio : 0;
+                        $storeBrokerageOne = $spreadCommissionOpen ? $storeBrokerageRatio : ($isSelfBrokerage ? $storeBrokerageRatio : 0);
                         $storeBrokerageTwo = 0;
                         $staffPercent = 0;
-                        if ($agentInfo['division_status'] == 1 && $agentInfo['division_end_time'] > time()) {
-                            $agentPercent = bcsub($agentInfo['division_percent'], $storeBrokerageOne, 2);
-                            $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
+                        if ($spreadCommissionOpen) {
+                            if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
+                                $agentPercent = $agentInfo['division_percent'];
+                            } else {
+                                $agentPercent = 0;
+                            }
+                            if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
+                                $divisionPercent = bcsub($divisionInfo['division_percent'], $agentPercent, 2);
+                                $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
+                            } else {
+                                $divisionPercent = 0;
+                            }
                         } else {
-                            $agentPercent = 0;
-                        }
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
-                            $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd($storeBrokerageOne, $agentPercent, 2), 2);
-                            $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
-                        } else {
-                            $divisionPercent = 0;
+                            if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
+                                $agentPercent = bcsub($agentInfo['division_percent'], $storeBrokerageOne, 2);
+                                $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
+                            } else {
+                                $agentPercent = 0;
+                            }
+                            if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
+                                $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd($storeBrokerageOne, $agentPercent, 2), 2);
+                                $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
+                            } else {
+                                $divisionPercent = 0;
+                            }
                         }
                     } else {
                         $storeBrokerageOne = $storeBrokerageRatio;
                         $storeBrokerageTwo = $userServices->value(['uid' => $userInfo['spread_uid']], 'spread_uid') == $userInfo['agent_id'] && !$isSelfBrokerage ? 0 : $storeBrokerageRatioTwo;
                         $brokerageOneTwo = bcadd($storeBrokerageOne, $storeBrokerageTwo, 2);
                         $staffPercent = 0;
-                        if ($agentInfo['division_status'] == 1 && $agentInfo['division_end_time'] > time()) {
+                        if ($agentInfo['division_status'] == 1 && (!$agentInfo['division_end_time'] || $agentInfo['division_end_time'] > time())) {
                             $agentPercent = bcsub($agentInfo['division_percent'], $brokerageOneTwo, 2);
                             $agentPercent = $agentPercent < 0 ? 0 : $agentPercent;
                         } else {
                             $agentPercent = 0;
                         }
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
+                        if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
                             $divisionPercent = bcsub($divisionInfo['division_percent'], bcadd($brokerageOneTwo, $agentPercent, 2), 2);
                             $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                         } else {
@@ -645,12 +682,12 @@ class DivisionServices extends BaseServices
                     /** 该用户为事业部推广 */
                     if ($userInfo['division_id'] == $userInfo['spread_uid']) {
                         /** 事业部直接下级 */
-                        $storeBrokerageOne = $isSelfBrokerage ? $storeBrokerageRatio : 0;
+                        $storeBrokerageOne = $spreadCommissionOpen ? $storeBrokerageRatio : ($isSelfBrokerage ? $storeBrokerageRatio : 0);
                         $storeBrokerageTwo = 0;
                         $staffPercent = 0;
                         $agentPercent = 0;
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
-                            $divisionPercent = bcsub($divisionInfo['division_percent'], $storeBrokerageOne, 2);
+                        if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
+                            $divisionPercent = $spreadCommissionOpen ? $divisionInfo['division_percent'] : bcsub($divisionInfo['division_percent'], $storeBrokerageOne, 2);
                             $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                         } else {
                             $divisionPercent = 0;
@@ -661,7 +698,7 @@ class DivisionServices extends BaseServices
                         $brokerageOneTwo = bcadd($storeBrokerageOne, $storeBrokerageTwo, 2);
                         $staffPercent = 0;
                         $agentPercent = 0;
-                        if ($divisionInfo['division_status'] == 1 && $divisionInfo['division_end_time'] > time()) {
+                        if ($divisionInfo['division_status'] == 1 && (!$divisionInfo['division_end_time'] || $divisionInfo['division_end_time'] > time())) {
                             $divisionPercent = bcsub($divisionInfo['division_percent'], $brokerageOneTwo, 2);
                             $divisionPercent = $divisionPercent < 0 ? 0 : $divisionPercent;
                         } else {

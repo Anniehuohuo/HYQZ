@@ -69,6 +69,9 @@ class SystemAdminServices extends BaseServices
         if (!$adminInfo->status) {
             throw new AdminException(400595);
         }
+        if ((int)$adminInfo->getData('division_id') > 0 && (int)$adminInfo->getData('level') === 0) {
+            $adminInfo->level = 1;
+        }
         $adminInfo->last_time = time();
         $adminInfo->last_ip = app('request')->ip();
         $adminInfo->login_count++;
@@ -149,6 +152,7 @@ class SystemAdminServices extends BaseServices
                 'account' => $adminInfo->getData('account'),
                 'head_pic' => get_file_link($adminInfo->getData('head_pic')),
                 'level' => $adminInfo->getData('level'),
+                'division_id' => $adminInfo->getData('division_id'),
                 'real_name' => $adminInfo->getData('real_name'),
             ],
             'logo' => sys_config('site_logo'),

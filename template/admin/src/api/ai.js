@@ -101,3 +101,63 @@ export function setAiAgentStatusApi(id, status) {
   });
 }
 
+export function getAiAgentKbDocsApi(id) {
+  return request({
+    url: `ai/agents/${id}/kb_docs`,
+    method: 'get',
+  });
+}
+
+export function importAiAgentKbDocApi(id, data) {
+  return request({
+    url: `ai/agents/${id}/kb_docs/import`,
+    method: 'post',
+    data,
+  });
+}
+
+export function deleteAiAgentKbDocApi(id, docId) {
+  return request({
+    url: `ai/agents/${id}/kb_docs/${docId}`,
+    method: 'delete',
+  });
+}
+
+export function getAiPowerConfigApi() {
+  return request({
+    url: 'ai/power_config',
+    method: 'get',
+  });
+}
+
+export function saveAiPowerConfigApi(data) {
+  return request({
+    url: 'ai/power_config',
+    method: 'post',
+    data,
+  });
+}
+
+export function getQingyanConfigApi() {
+  return request({
+    url: 'ai/qingyan_config',
+    method: 'get',
+  });
+}
+
+export function saveQingyanConfigApi(data) {
+  return request({
+    url: 'ai/qingyan_config',
+    method: 'post',
+    data,
+  });
+}
+
+export function verifyQingyanAssistantApi(data) {
+  return request({
+    url: 'ai/qingyan_config/verify',
+    method: 'post',
+    data,
+  });
+}
+

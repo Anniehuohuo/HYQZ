@@ -4,7 +4,7 @@
 		<view class="sys-head">
 			<view class="sys-bar" :style="{ height: sysHeight }"></view>
 			<!-- #ifdef MP -->
-			<view class="sys-title">智能体矩阵</view>
+			<view class="sys-title">{{ pageTitle }}</view>
 			<!-- #endif -->
 			<view class="bg"></view>
 		</view>
@@ -32,28 +32,29 @@
 
 		<view class="list">
 			<view class="grid" v-if="filteredAgents.length">
-				<view class="agentCard" v-for="a in filteredAgents" :key="a.id" @click="goChat(a)">
-					<view class="cardHeader">
-						<view class="agentIcon">
-							<text class="agentIconText">{{ a.abbr }}</text>
-						</view>
-						<view class="agentMeta">
-							<text class="agentName">{{ a.name }}</text>
-							<view class="agentTag">
-								<text class="agentTagText">{{ a.cateName }}</text>
+				<view class="agentCard" :class="{ locked: !a.unlocked, unlocked: !!a.unlocked }" v-for="a in filteredAgents" :key="a.id" @click="goChat(a)">
+					<view class="cardContent">
+						<view class="cardHeader">
+							<view class="agentAvatar" aria-hidden="true">
+								<image v-if="getAvatarUrl(a) && !avatarFailed[a.id]" class="agentAvatarImg" :src="getAvatarUrl(a)" mode="aspectFill" lazy-load @error="onAvatarError(a.id)" />
+								<view v-else class="agentAvatarFallback">
+									<text class="agentAvatarText">{{ a.abbr }}</text>
+								</view>
+							</view>
+							<view class="agentMeta">
+								<text class="agentName">{{ getDisplayName(a.name) }}</text>
+								<view class="agentTag">
+									<text class="agentTagText">{{ a.cateName }}</text>
+								</view>
 							</view>
 						</view>
-						<view class="enterIcon">
-							<text class="iconfont icon-jinru1"></text>
-						</view>
+
+						<text class="agentDesc">{{ getDisplayDesc(a.desc) }}</text>
 					</view>
-					
-					<text class="agentDesc">{{ a.desc }}</text>
-					
-					<view class="agentFoot">
-						<view class="miniChip" v-for="(t, i) in a.tags" :key="i">
-							<text class="miniChipText"># {{ t }}</text>
-						</view>
+
+					<view v-if="!a.unlocked" class="lockedMask" aria-hidden="true"></view>
+					<view class="statusIcon" aria-hidden="true">
+						<text class="iconfont" :class="a.unlocked ? 'icon-ic-complete1' : 'icon-suozi'"></text>
 					</view>
 				</view>
 			</view>
@@ -75,8 +76,13 @@
 	import colors from '@/mixins/color.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
 	import {
-		getAgentMatrix
+		getAgentMatrix,
+		getAgentAccess
 	} from '@/api/ai.js'
+	import {
+		toLogin
+	} from '@/libs/login.js'
+	import { HTTP_REQUEST_URL } from '@/config/app'
 
 	export default {
 		mixins: [colors],
@@ -89,8 +95,12 @@
 				pdHeight: 0,
 				showBar: false,
 				sysHeight: sysHeight,
+				pageTitle: '智能体矩阵',
+				onlyUnlocked: false,
 				activeCate: 'all',
 				keyword: '',
+				avatarFailed: {},
+				avatarUrlCache: {},
 				categories: [{
 					key: 'all',
 					name: '全部'
@@ -110,15 +120,26 @@
 			filteredAgents() {
 				const kw = (this.keyword || '').trim()
 				return this.agents.filter((a) => {
+					if (this.onlyUnlocked && !a.unlocked) return false
 					const cateOk = this.activeCate === 'all' || a.cate === this.activeCate
 					if (!cateOk) return false
 					if (!kw) return true
-					const hay = `${a.name} ${a.desc} ${a.cateName} ${(a.tags || []).join(' ')}`
+					const hay = `${a.name} ${a.desc} ${a.cateName}`
 					return hay.indexOf(kw) > -1
 				})
 			}
 		},
-		onLoad() {
+		onLoad(option) {
+			const onlyUnlocked = option && String(option.onlyUnlocked || '') === '1'
+			this.onlyUnlocked = onlyUnlocked
+			const title = option && option.title ? String(option.title) : ''
+			if (title) this.pageTitle = title
+			else this.pageTitle = onlyUnlocked ? '我的智能体' : '智能体矩阵'
+			// #ifdef H5 || APP-PLUS || MP
+			uni.setNavigationBarTitle({
+				title: this.pageTitle
+			})
+			// #endif
 			this.loadData()
 		},
 		methods: {
@@ -142,10 +163,11 @@
 									id: a.id,
 									cate: c.cate_key,
 									cateName: c.cate_name,
-									abbr: a.abbr || a.agent_name.slice(0, 1),
-									name: a.agent_name,
-									desc: a.description,
-									tags: a.tags || []
+									abbr: a.abbr || String(a.agent_name || '').slice(0, 1),
+									name: String(a.agent_name || ''),
+									avatar: a.avatar || '',
+									desc: String(a.description || ''),
+									unlocked: !!a.unlocked
 								})
 							})
 						}
@@ -153,6 +175,8 @@
 
 					this.categories = cats
 					this.agents = agents
+					this.avatarFailed = {}
+					this.avatarUrlCache = {}
 				}).catch(err => {
 					// uni.showToast({ title: err.msg || '加载失败', icon: 'none' })
 				})
@@ -171,9 +195,73 @@
 				this.activeCate = 'all'
 				this.keyword = ''
 			},
+			getAvatarUrl(agent) {
+				const id = Number(agent && agent.id) || 0
+				if (!id) return ''
+				if (this.avatarUrlCache[id]) return this.avatarUrlCache[id]
+				const raw = (agent && agent.avatar) ? String(agent.avatar) : ''
+				const url = this.normalizeAvatarUrl(raw)
+				this.avatarUrlCache[id] = url
+				return url
+			},
+			normalizeAvatarUrl(url) {
+				const s = String(url || '').trim()
+				if (!s) return ''
+				if (/^https?:\/\//i.test(s)) return s
+				if (s.startsWith('//')) return 'https:' + s
+				if (s.startsWith('/')) return HTTP_REQUEST_URL + s
+				return HTTP_REQUEST_URL + '/' + s
+			},
+			onAvatarError(agentId) {
+				const id = Number(agentId) || 0
+				if (!id) return
+				this.$set(this.avatarFailed, id, true)
+			},
+			truncateText(input, maxLen) {
+				const text = String(input || '')
+				const limit = Number(maxLen) || 0
+				if (!limit) return ''
+				const chars = Array.from(text)
+				if (chars.length <= limit) return text
+				return chars.slice(0, limit).join('') + '...'
+			},
+			getDisplayName(name) {
+				return this.truncateText(name, 8)
+			},
+			getDisplayDesc(desc) {
+				return this.truncateText(desc, 20)
+			},
 			goChat(agent) {
-				uni.navigateTo({
-					url: `/pages/ai/chat?agentId=${encodeURIComponent(agent.id)}&title=${encodeURIComponent(agent.name)}`
+				const agentId = Number(agent && agent.id) || 0
+				if (!agentId) return
+				getAgentAccess({
+					agent_id: agentId
+				}).then(res => {
+					const d = res && res.data ? res.data : {}
+					if (d.unlocked) {
+						uni.navigateTo({
+							url: `/pages/ai/chat?agentId=${encodeURIComponent(agentId)}&title=${encodeURIComponent(agent.name)}`
+						})
+						return
+					}
+					const productId = Number(d.product_id) || 0
+					if (!productId) {
+						uni.showToast({
+							title: '未配置购买商品',
+							icon: 'none'
+						})
+						return
+					}
+					uni.navigateTo({
+						url: `/pages/goods_details/index?id=${encodeURIComponent(productId)}&agent_id=${encodeURIComponent(agentId)}&agent_title=${encodeURIComponent(agent.name)}`
+					})
+				}).catch(err => {
+					const msg = err && err.msg ? err.msg : err
+					if (String(msg || '').includes('请先登录')) return toLogin()
+					uni.showToast({
+						title: typeof msg === 'string' ? msg : '操作失败',
+						icon: 'none'
+					})
 				})
 			}
 		}
@@ -306,20 +394,120 @@
 	.grid {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 20rpx;
+		justify-content: space-between;
 	}
 
 	.agentCard {
-		width: calc((100% - 20rpx) / 2);
+		flex: 1 1 calc(50% - 12px);
+		max-width: calc(50% - 12px);
 		position: relative;
-		padding: 24rpx;
-		border-radius: 24rpx;
-		background: rgba(255, 255, 255, 0.9);
-		backdrop-filter: blur(10px);
-		box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.03);
-		border: 1rpx solid rgba(255, 255, 255, 0.6);
+		overflow: hidden;
+		border-radius: 16px;
+		background: rgba(255, 255, 255, 0.2);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+		border: 1px solid rgba(255, 255, 255, 0.3);
 		display: flex;
 		flex-direction: column;
+		height: auto;
+		min-height: 120px;
+		margin-bottom: 20px;
+	}
+
+	.agentCard::before {
+		content: '';
+		display: block;
+		padding-top: 56.25%;
+	}
+	
+	.agentCard.locked {
+	}
+
+	.cardContent {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		padding: 16px 20px;
+	}
+	
+	.agentCard.unlocked {
+	}
+	
+	.agentCard.unlocked::after {
+		content: '';
+		position: absolute;
+		inset: -30%;
+		border-radius: 16px;
+		background: linear-gradient(
+			120deg,
+			rgba(255, 152, 0, 0) 0%,
+			rgba(255, 152, 0, 0.12) 22%,
+			rgba(255, 200, 120, 0.22) 50%,
+			rgba(255, 152, 0, 0.12) 78%,
+			rgba(255, 152, 0, 0) 100%
+		);
+		filter: blur(10px);
+		transform: translateX(-60%) rotate(-6deg);
+		opacity: 0.9;
+		animation: agentOrangeShimmer 3.6s ease-in-out infinite;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	@keyframes agentOrangeShimmer {
+		0% {
+			transform: translateX(-60%) rotate(-6deg);
+		}
+		60% {
+			transform: translateX(60%) rotate(-6deg);
+		}
+		100% {
+			transform: translateX(60%) rotate(-6deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.agentCard.unlocked::after {
+			animation: none;
+		}
+	}
+
+	.lockedMask {
+		position: absolute;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.3);
+		z-index: 2;
+		pointer-events: none;
+	}
+	
+	.statusIcon {
+		position: absolute;
+		right: 12px;
+		bottom: 12px;
+		width: 24px;
+		height: 24px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 3;
+		pointer-events: none;
+	}
+
+	.statusIcon .iconfont {
+		font-size: 24px;
+		line-height: 24px;
+	}
+
+	.agentCard.unlocked .statusIcon .iconfont {
+		color: #ff9800;
+	}
+
+	.agentCard.locked .statusIcon .iconfont {
+		color: rgba(255, 255, 255, 0.92);
 	}
 
 	.agentCard:active {
@@ -329,27 +517,42 @@
 
 	.cardHeader {
 		display: flex;
-		align-items: flex-start;
-		gap: 16rpx;
-		margin-bottom: 16rpx;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 10px;
 	}
 
-	.agentIcon {
-		width: 80rpx;
-		height: 80rpx;
-		border-radius: 20rpx;
-		background: linear-gradient(135deg, rgba(241, 165, 92, 0.15) 0%, rgba(241, 165, 92, 0.05) 100%);
-		border: 1rpx solid rgba(241, 165, 92, 0.2);
+	.agentAvatar {
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.22);
+		border: 1px solid rgba(255, 255, 255, 0.3);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex: none;
+		overflow: hidden;
 	}
 
-	.agentIconText {
-		font-size: 36rpx;
-		font-weight: 900;
-		color: #a95608;
+	.agentAvatarImg {
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+	}
+
+	.agentAvatarFallback {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.agentAvatarText {
+		font-size: 18px;
+		font-weight: 700;
+		color: rgba(31, 35, 41, 0.78);
 	}
 
 	.agentMeta {
@@ -357,19 +560,18 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
-		height: 80rpx;
-		padding: 2rpx 0;
+		gap: 6px;
+		padding: 1px 0;
 	}
 
 	.agentName {
-		font-size: 30rpx;
-		font-weight: 800;
-		color: #1f2329;
-		line-height: 1.2;
+		font-size: 15px;
+		font-weight: 600;
+		color: rgba(31, 35, 41, 0.9);
+		line-height: 1.25;
+		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
 	.agentTag {
@@ -377,53 +579,23 @@
 	}
 
 	.agentTagText {
-		font-size: 20rpx;
-		color: #a95608;
-		background: rgba(241, 165, 92, 0.1);
-		padding: 4rpx 10rpx;
-		border-radius: 6rpx;
+		font-size: 11px;
+		color: rgba(31, 35, 41, 0.72);
+		background: rgba(255, 255, 255, 0.18);
+		padding: 3px 8px;
+		border-radius: 8px;
 		font-weight: 600;
-	}
-	
-	.enterIcon {
-		position: absolute;
-		top: 24rpx;
-		right: 24rpx;
-		opacity: 0.3;
-	}
-	
-	.enterIcon .iconfont {
-		font-size: 28rpx;
 	}
 
 	.agentDesc {
-		font-size: 24rpx;
-		color: rgba(31, 35, 41, 0.6);
-		line-height: 1.5;
+		font-size: 12px;
+		color: rgba(31, 35, 41, 0.68);
+		line-height: 1.45;
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
 		overflow: hidden;
-		height: 72rpx; /* fixed height for alignment */
-		margin-bottom: 16rpx;
-	}
-
-	.agentFoot {
-		margin-top: auto;
-		display: flex;
-		gap: 8rpx;
-		flex-wrap: wrap;
-	}
-
-	.miniChip {
-		padding: 4rpx 10rpx;
-		border-radius: 8rpx;
-		background: #f6f7f8;
-	}
-
-	.miniChipText {
-		font-size: 20rpx;
-		color: rgba(31, 35, 41, 0.6);
+		margin-top: 2px;
 	}
 
 	.empty {

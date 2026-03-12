@@ -23,3 +23,21 @@ export function getRecentSession(data) {
 		noAuth: false
 	});
 }
+
+export function clearChatHistory(data) {
+	return request.post("ai/chat/clear", data, {
+		noAuth: false
+	});
+}
+
+export function getAgentSaleInfo(data) {
+	return request.get("ai/agent/sale_info", data, {
+		noAuth: false
+	});
+}
+
+export function getAgentAccess(data) {
+	return request.get("ai/agent/access", data, {
+		noAuth: false
+	});
+}

@@ -78,7 +78,7 @@
                   v-else-if="!row.virtual_list.length && !row.stock && formValidate.virtual_type == 1"
                   v-db-click
                   @click="addVirtual(scope.$index, 'oneFormValidate')"
-                  >添加卡密</el-button
+                  >添加网盘信息</el-button
                 >
                 <span
                   class="see"
@@ -246,7 +246,7 @@
                   v-else-if="!row.virtual_list.length && !row.stock && formValidate.virtual_type == 1"
                   v-db-click
                   @click="addVirtual(scope.$index + 1, 'manyFormValidate')"
-                  >添加卡密</el-button
+                  >添加网盘信息</el-button
                 >
                 <span
                   class="see"

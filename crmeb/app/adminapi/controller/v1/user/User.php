@@ -16,6 +16,7 @@ use app\adminapi\controller\AuthController;
 use crmeb\services\CacheService;
 use think\exception\ValidateException;
 use think\facade\App;
+use think\facade\Db;
 
 class User extends AuthController
 {
@@ -468,10 +469,34 @@ class User extends AuthController
      */
     public function getNewGift()
     {
+        $rewardCoupon = sys_config('reward_coupon') == '' ? [] : sys_config('reward_coupon');
+        if (is_array($rewardCoupon) && $rewardCoupon) {
+            try {
+                $ids = array_values(array_filter(array_map(function ($it) {
+                    return (int)($it['id'] ?? 0);
+                }, $rewardCoupon)));
+                if ($ids) {
+                    $validIds = Db::name('store_coupon_issue')->whereIn('id', $ids)->where('is_del', 0)->column('id');
+                    $validMap = [];
+                    foreach ((array)$validIds as $vid) {
+                        $validMap[(int)$vid] = 1;
+                    }
+                    $newRewardCoupon = array_values(array_filter($rewardCoupon, function ($it) use ($validMap) {
+                        return isset($validMap[(int)($it['id'] ?? 0)]);
+                    }));
+                    if (count($newRewardCoupon) !== count($rewardCoupon)) {
+                        app()->make(SystemConfigServices::class)->update('reward_coupon', ['value' => json_encode($newRewardCoupon)], 'menu_name');
+                        CacheService::clear();
+                        $rewardCoupon = $newRewardCoupon;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
         $data = [
             'reward_money' => intval(sys_config('reward_money')),
             'reward_integral' => intval(sys_config('reward_integral')),
-            'reward_coupon' => sys_config('reward_coupon') == '' ? [] : sys_config('reward_coupon')
+            'reward_coupon' => $rewardCoupon
         ];
         return app('json')->success($data);
     }

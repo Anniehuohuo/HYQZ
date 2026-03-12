@@ -192,7 +192,7 @@
       <el-dialog
         :visible.sync="addVirtualModel"
         width="720px"
-        title="添加卡密"
+        title="添加网盘信息"
         :show-close="true"
         :close-on-click-modal="false"
         @closed="initVirtualData"
@@ -200,14 +200,14 @@
         <div class="trip"></div>
         <div class="type-radio">
           <el-form label-width="85px">
-            <el-form-item label="卡密类型：">
+            <el-form-item label="网盘信息类型：">
               <el-radio-group v-model="disk_type" size="large">
-                <el-radio :label="1">固定卡密</el-radio>
-                <el-radio :label="2">一次性卡密</el-radio>
+                <el-radio :label="1">固定网盘信息</el-radio>
+                <el-radio :label="2">一次性网盘信息</el-radio>
               </el-radio-group>
               <div v-if="disk_type == 1">
                 <div class="stock-disk">
-                  <el-input v-model="disk_info" size="large" type="textarea" :rows="4" placeholder="填写卡密信息" />
+                  <el-input v-model="disk_info" size="large" type="textarea" :rows="4" placeholder="填写网盘信息（如：链接 + 提取码）" />
                 </div>
                 <div class="stock-input">
                   <!-- <el-input type="number" v-model="stock" size="large" :min='0' placeholder="填写库存数量">
@@ -219,21 +219,21 @@
               </div>
               <div class="scroll-virtual" v-if="disk_type == 2">
                 <div class="virtual-data mb10" v-for="(item, index) in virtualList" :key="index">
-                  <span class="mr10 virtual-title">卡号{{ index + 1 }}：</span>
+                  <span class="mr10 virtual-title">链接{{ index + 1 }}：</span>
                   <el-input
                     class="mr10"
                     type="text"
                     v-model.trim="item.key"
                     style="width: 150px"
-                    placeholder="请输入卡号(非必填)"
+                    placeholder="请输入链接(非必填)"
                   ></el-input>
-                  <span class="mr10 virtual-title">卡密{{ index + 1 }}：</span>
+                  <span class="mr10 virtual-title">提取码{{ index + 1 }}：</span>
                   <el-input
                     class="mr10"
                     type="text"
                     v-model.trim="item.value"
                     style="width: 150px"
-                    placeholder="请输入卡密"
+                    placeholder="请输入提取码"
                   ></el-input>
                   <span class="deteal-btn" v-db-click @click="removeVirtual(index)">删除</span>
                 </div>
@@ -248,7 +248,7 @@
                   :on-success="upFile"
                   :before-upload="beforeUpload"
                 >
-                  <el-button>导入卡密</el-button>
+                  <el-button>导入网盘信息</el-button>
                 </el-upload>
               </div>
             </el-form-item>
@@ -409,7 +409,7 @@ export default {
       ],
       virtual: [
         { tit: '普通商品', id: 0, tit2: '物流发货' },
-        { tit: '卡密/网盘', id: 1, tit2: '自动发货' },
+        { tit: '网盘/提取码', id: 1, tit2: '自动发货' },
         { tit: '优惠券', id: 2, tit2: '自动发货' },
         { tit: '虚拟商品', id: 3, tit2: '虚拟发货' },
       ],
@@ -489,7 +489,7 @@ export default {
         logistics: ['1'], //选择物流方式
         freight: 2, //运费设置
         postage: 0, //设置运费金额
-        recommend: [], //商品推荐
+        recommend: ['is_hot'], //商品推荐
         presale_day: 1, //预售发货时间-结束
         presale: false, //预售商品开关
         is_limit: false,
@@ -888,7 +888,7 @@ export default {
           this.headTab = baseHeadTabs;
           break;
 
-        case 1: // 卡密/网盘商品
+        case 1: // 网盘/提取码商品
           this.formValidate.virtual_type = 1;
           this.formValidate.postage = 0;
           this.formValidate.is_virtual = 1;
@@ -1144,7 +1144,7 @@ export default {
         for (let i = 0; i < this.virtualList.length; i++) {
           const element = this.virtualList[i];
           if (!element.value) {
-            this.$message.error('请输入所有卡密');
+            this.$message.error('请输入所有提取码');
             return;
           }
         }
@@ -1159,7 +1159,7 @@ export default {
         this.$set(this[this.tabName][this.tabIndex], 'disk_info', '');
       } else {
         if (!this.disk_info.length) {
-          return this.$message.error('请填写卡密信息');
+          return this.$message.error('请填写网盘信息');
         }
         if (!this.stock) {
           return this.$message.error('请填写库存数量');
@@ -1674,7 +1674,7 @@ export default {
         // 找到slot 等于 fictitious 将title改为规格名称
         this.formValidate.header.map((item) => {
           if (item.slot === 'fictitious') {
-            item.title = this.formValidate.virtual_type == 1 ? '添加卡密/网盘' : '选择优惠券';
+            item.title = this.formValidate.virtual_type == 1 ? '添加网盘/提取码' : '选择优惠券';
           }
         });
       } else if (this.formValidate.virtual_type == 3) {

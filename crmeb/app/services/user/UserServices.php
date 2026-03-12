@@ -34,6 +34,7 @@ use app\services\message\MessageSystemServices;
 use app\services\system\SystemUserLevelServices;
 use app\services\user\member\MemberCardServices;
 use app\services\wechat\WechatUserServices;
+use app\services\ai\AiPowerServices;
 use crmeb\exceptions\AdminException;
 use crmeb\exceptions\ApiException;
 use crmeb\services\CacheService;
@@ -41,6 +42,7 @@ use crmeb\services\FormBuilder as Form;
 use crmeb\services\FormBuilder;
 use crmeb\services\app\WechatService;
 use think\Exception;
+use think\facade\Db;
 use think\facade\Route as Url;
 
 /**
@@ -595,12 +597,20 @@ class UserServices extends BaseServices
             $userLevel = app()->make(UserLevelServices::class)->getUsersLevelInfo($uids);
             $agentLevel = app()->make(AgentLevelServices::class)->getAgentLevelArr();
             $spread_names = $this->dao->getColumn([['uid', 'in', array_unique(array_column($list, 'spread_uid'))]], 'nickname', 'uid');
+            $aiPowerBalances = [];
+            try {
+                app()->make(AiPowerServices::class)->quota(0);
+                $aiPowerBalances = Db::name('ai_power_user')->whereIn('uid', $uids)->column('balance', 'uid');
+            } catch (\Throwable $e) {
+                $aiPowerBalances = [];
+            }
             foreach ($list as &$item) {
                 if (empty($item['addres'])) {
                     if (!empty($item['country']) || !empty($item['province']) || !empty($item['city'])) {
                         $item['addres'] = $item['country'] . $item['province'] . $item['city'];
                     }
                 }
+                $item['ai_power_balance'] = (int)($aiPowerBalances[$item['uid']] ?? 0);
                 $item['status'] = ($item['status'] == 1) ? '正常' : '禁止';
                 $item['birthday'] = $item['birthday'] ? date('Y-m-d', (int)$item['birthday']) : '';
                 $item['extract_count_price'] = $userExtract[$item['uid']] ?? 0;//累计提现

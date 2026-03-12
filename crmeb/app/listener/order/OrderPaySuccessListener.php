@@ -16,6 +16,7 @@ use app\services\order\StoreOrderDeliveryServices;
 use app\services\order\StoreOrderInvoiceServices;
 use app\services\order\StoreOrderServices;
 use app\services\order\StoreOrderStatusServices;
+use app\services\order\StoreOrderTakeServices;
 use app\services\pay\PayServices;
 use app\services\product\product\StoreProductCouponServices;
 use app\services\product\sku\StoreProductAttrValueServices;
@@ -23,6 +24,7 @@ use app\services\product\sku\StoreProductVirtualServices;
 use app\services\message\MessageSystemServices;
 use app\services\statistic\CapitalFlowServices;
 use app\services\user\UserServices;
+use app\services\ai\AiAgentGoodsServices;
 use crmeb\exceptions\AdminException;
 use crmeb\interfaces\ListenerInterface;
 use think\facade\Log;
@@ -71,6 +73,35 @@ class OrderPaySuccessListener implements ListenerInterface
             /** @var StoreOrderDeliveryServices $orderDeliveryServices */
             $orderDeliveryServices = app()->make(StoreOrderDeliveryServices::class);
             $orderDeliveryServices->virtualSend($orderInfo);
+            try {
+                $cartIds = $orderInfo['cart_id'] ?? [];
+                if (is_string($cartIds)) {
+                    $cartIds = array_filter(explode(',', $cartIds));
+                }
+                if (!is_array($cartIds)) {
+                    $cartIds = [];
+                }
+                /** @var StoreOrderCartInfoServices $cartInfoServices */
+                $cartInfoServices = app()->make(StoreOrderCartInfoServices::class);
+                $cartInfo = $cartInfoServices->getOrderCartInfo((int)$orderInfo['id']);
+                /** @var AiAgentGoodsServices $aiAgentGoodsServices */
+                $aiAgentGoodsServices = app()->make(AiAgentGoodsServices::class);
+                $isAiUnlock = false;
+                foreach ($cartIds as $cid) {
+                    $cid = is_numeric($cid) ? (int)$cid : $cid;
+                    $productId = (int)($cartInfo[$cid]['cart_info']['productInfo']['id'] ?? 0);
+                    if ($productId > 0 && $aiAgentGoodsServices->isUnlockProductId($productId)) {
+                        $isAiUnlock = true;
+                        break;
+                    }
+                }
+                if ($isAiUnlock) {
+                    /** @var StoreOrderTakeServices $takeServices */
+                    $takeServices = app()->make(StoreOrderTakeServices::class);
+                    $takeServices->takeOrder((string)$orderInfo['order_id'], (int)$orderInfo['uid']);
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
         // 写入资金流水

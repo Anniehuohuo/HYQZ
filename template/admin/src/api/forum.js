@@ -31,3 +31,18 @@ export function forumDraftListApi(params) {
     params,
   });
 }
+
+export function forumConfigGetApi() {
+  return request({
+    url: 'forum/config',
+    method: 'get',
+  });
+}
+
+export function forumConfigSaveApi(data) {
+  return request({
+    url: 'forum/config',
+    method: 'post',
+    data,
+  });
+}

@@ -108,6 +108,7 @@ class StoreCoupon extends AuthController
         if (!$id) return app('json')->fail(100100);
 
         $this->services->update($id, ['is_del' => 1]);
+        $this->services->removeFromNewGiftConfig((int)$id);
         /** @var StoreProductCouponServices $storeProductService */
         $storeProductService = app()->make(StoreProductCouponServices::class);
         //删除商品关联这个优惠券

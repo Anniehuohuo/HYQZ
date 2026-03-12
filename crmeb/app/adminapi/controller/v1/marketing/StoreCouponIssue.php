@@ -138,6 +138,7 @@ class StoreCouponIssue extends AuthController
     public function delete($id)
     {
         $this->services->update($id, ['is_del' => 1]);
+        $this->services->removeFromNewGiftConfig((int)$id);
         /** @var StoreProductCouponServices $storeProductService */
         $storeProductService = app()->make(StoreProductCouponServices::class);
         //删除商品关联这个优惠券

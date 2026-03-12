@@ -6,7 +6,9 @@
 				"navigationBarTitleText": "慧圆智慧父母",
 				"navigationStyle": "default",
 				"navigationBarBackgroundColor": "#fff3e6",
-				"navigationBarTextStyle": "black"
+				"navigationBarTextStyle": "black",
+				"enableShareAppMessage": true,
+				"enableShareTimeline": true
 			}
 		},
 		{
@@ -26,6 +28,15 @@
 				"navigationBarTitleText": "对话",
 				"navigationStyle": "default",
 				"navigationBarBackgroundColor": "#fff3e6",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/ai/blocks_demo",
+			"style": {
+				"navigationBarTitleText": "渲染演示",
+				"navigationStyle": "default",
+				"navigationBarBackgroundColor": "#f4f6f8",
 				"navigationBarTextStyle": "black"
 			}
 		},
@@ -139,46 +150,20 @@
 			]
 		},
 		{
-			"root": "pages/forum",
-			"name": "forum",
+			"root": "pages/parents_classroom",
+			"name": "parents_classroom",
 			"pages": [
-			{
-				"path": "index",
-				"style": {
-					"navigationBarTitleText": "论坛",
-					"navigationBarBackgroundColor": "#eef2f3",
-					// #ifdef MP || APP-PLUS
-					"navigationStyle": "custom",
-					"navigationBarTextStyle": "black"
-					// #endif
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "家长课堂",
+						"navigationBarBackgroundColor": "#f6f7fb",
+						"navigationBarTextStyle": "black"
+					}
 				}
-			},
-			{
-				"path": "detail",
-				"style": {
-					"navigationBarTitleText": "帖子详情",
-					"navigationBarBackgroundColor": "#eef2f3",
-					"navigationBarTextStyle": "black"
-				}
-			},
-			{
-				"path": "publish",
-				"style": {
-					"navigationBarTitleText": "发帖",
-					"navigationBarBackgroundColor": "#eef2f3",
-					"navigationBarTextStyle": "black"
-				}
-			},
-			{
-				"path": "me",
-				"style": {
-					"navigationBarTitleText": "我的论坛",
-					"navigationBarBackgroundColor": "#eef2f3",
-					"navigationBarTextStyle": "black"
-				}
-			}
 			]
-		}, {
+		},
+		{
 			"root": "pages/goods",
 			"name": "goods",
 			"pages": [{
@@ -432,6 +417,17 @@
 			"root": "pages/users",
 			"name": "users",
 			"pages": [{
+					"path": "ai_power_payment/index",
+					"style": {
+						"navigationBarTitleText": "算力充值",
+						"app-plus": {
+							"titleNView": {
+								"type": "default"
+							}
+						}
+					}
+				},
+				{
 					"path": "user_vip_areer/index",
 					"style": {
 						"navigationBarTitleText": "经验记录",
@@ -732,7 +728,7 @@
 							// #ifdef MP
 							,
 						"navigationBarTextStyle": "black",
-						"navigationBarBackgroundColor": "#FFFFFF"
+						"navigationBarBackgroundColor": "#fff3e6"
 							// #endif
 							,
 						"app-plus": {
@@ -765,7 +761,7 @@
 							// #ifdef MP
 							,
 						"navigationBarTextStyle": "black",
-						"navigationBarBackgroundColor": "#FFFFFF"
+						"navigationBarBackgroundColor": "#fff3e6"
 							// #endif
 							,
 						"app-plus": {
@@ -783,7 +779,7 @@
 							// #ifdef MP
 							,
 						"navigationBarTextStyle": "black",
-						"navigationBarBackgroundColor": "#FFFFFF"
+						"navigationBarBackgroundColor": "#fff3e6"
 							// #endif
 							,
 						"app-plus": {
@@ -836,10 +832,10 @@
 					"path": "user_distribution_level/index",
 					"style": {
 						"navigationBarTitleText": "分销等级",
-						"navigationBarBackgroundColor": "#232323"
+						"navigationBarBackgroundColor": "#fff3e6"
 							// #ifdef MP || APP-PLUS
 							,
-						"navigationBarTextStyle": "white"
+						"navigationBarTextStyle": "black"
 							// #endif
 							,
 						"app-plus": {

@@ -67,4 +67,20 @@ class StoreOrderStoreOrderCartInfoDao extends BaseDao
             $query->where($this->alias . '.uid', $where['uid']);
         })->column($this->joinAlis . '.product_id');
     }
+
+    public function findPaidOrderIdByProduct(int $uid, int $productId): int
+    {
+        $uid = (int)$uid;
+        $productId = (int)$productId;
+        if ($uid <= 0 || $productId <= 0) return 0;
+        return (int)$this->getModel()
+            ->where($this->alias . '.uid', $uid)
+            ->where($this->alias . '.paid', 1)
+            ->where($this->alias . '.refund_status', 0)
+            ->where($this->alias . '.is_del', 0)
+            ->where($this->alias . '.is_system_del', 0)
+            ->where($this->joinAlis . '.product_id', $productId)
+            ->order($this->alias . '.id DESC')
+            ->value($this->alias . '.id');
+    }
 }

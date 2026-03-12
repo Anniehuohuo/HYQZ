@@ -64,8 +64,14 @@ Route::group(function () {
     Route::post('ai/home_chat', 'v1.ai.HomeAgent/chat')->option(['real_name' => '首页引流助手对话']);
     Route::post('ai/chat', 'v1.ai.AiController/chat')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI对话']);
     Route::get('ai/agent_matrix', 'v1.ai.AgentMatrix/index')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体矩阵']);
+    Route::get('ai/agent/sale_info', 'v1.ai.AgentGoods/saleInfo')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体售卖信息']);
+    Route::get('ai/agent/access', 'v1.ai.AgentGoods/access')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体解锁校验']);
     Route::get('ai/chat/history', 'v1.ai.AiController/history')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI对话历史']);
+    Route::post('ai/chat/clear', 'v1.ai.AiController/clearHistory')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI清空对话']);
     Route::get('ai/session/recent', 'v1.ai.AiController/recentSession')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI最近会话']);
+    Route::get('ai/power/quota', 'v1.ai.AiPower/quota')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI算力额度']);
+    Route::get('ai/power/recharge_config', 'v1.ai.AiPower/rechargeConfig')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI算力充值配置']);
+    Route::post('ai/power/recharge', 'v1.ai.AiPower/recharge')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI算力充值']);
 
 })->middleware(\app\http\middleware\AllowOriginMiddleware::class)
     ->middleware(\app\api\middleware\StationOpenMiddleware::class)

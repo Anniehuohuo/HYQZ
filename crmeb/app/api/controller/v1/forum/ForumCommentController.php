@@ -19,6 +19,7 @@ class ForumCommentController
 
     public function lst(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $postId = (int)$id;
         $this->postServices->ensurePostExists($postId);
         return app('json')->success($this->services->getCommentList($postId));
@@ -26,6 +27,7 @@ class ForumCommentController
 
     public function create(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $postId = (int)$id;
         [$content] = $request->postMore([
@@ -39,6 +41,7 @@ class ForumCommentController
 
     public function delete(Request $request, $id)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $commentId = (int)$id;
         $postId = $this->services->deleteComment($uid, $commentId);
@@ -48,6 +51,7 @@ class ForumCommentController
 
     public function my(Request $request)
     {
+        if (!(int)sys_config('forum_enabled', 0)) return app('json')->fail('该功能暂未开放');
         $uid = (int)$request->uid();
         $data = $this->services->getMyComments($uid);
         $postIds = [];

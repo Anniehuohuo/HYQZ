@@ -38,9 +38,25 @@ return [
             // 单文件日志写入
             'single'      => false,
             // 独立日志级别
-            'apart_level' => ['error', 'fail', 'success', 'crontab', 'crmeb', 'listener'],
+            'apart_level' => ['error', 'warning', 'fail', 'success', 'info', 'crontab', 'crmeb', 'listener'],
             // 最大日志文件数量
             'max_files'   => 60,
+            'time_format' => 'Y-m-d H:i:s',
+            'format'      => '%s|%s|%s'
+        ],
+        'ai_recommend' => [
+            'type'        => 'File',
+            'path'        => app()->getRuntimePath() . 'log' . DIRECTORY_SEPARATOR,
+            'single'      => 'ai_home_recommend.log',
+            'max_files'   => 30,
+            'time_format' => 'Y-m-d H:i:s',
+            'format'      => '%s|%s|%s'
+        ],
+        'qingyan_debug' => [
+            'type'        => 'File',
+            'path'        => app()->getRuntimePath() . 'log' . DIRECTORY_SEPARATOR,
+            'single'      => 'qingyan_debug.log',
+            'max_files'   => 30,
             'time_format' => 'Y-m-d H:i:s',
             'format'      => '%s|%s|%s'
         ],

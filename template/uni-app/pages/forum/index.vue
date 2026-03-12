@@ -11,19 +11,35 @@
 		<!-- #endif -->
 
 		<view class="hero">
-			<text class="slogan">分享经验 · 互相支持 · 共同成长</text>
-			<scroll-view scroll-x class="tabsScroll" show-scrollbar="false" scroll-with-animation :scroll-into-view="tabIntoView">
-				<view class="tabs">
-					<view class="tab" :id="'tab_' + t.key" :class="{ active: activeTab === t.key }" v-for="t in tabs" :key="t.key" @tap="setActiveTab(t.key)">
-						<text class="tabText">{{ t.name }}</text>
-						<view class="tabLine" v-if="activeTab === t.key"></view>
-					</view>
+			<view class="topTabs">
+				<view class="topTab" :class="{ active: activeGroup === 'manage' }" @tap="setActiveGroup('manage')">
+					<text class="topTabText">我管理的</text>
+					<view class="topTabLine" v-if="activeGroup === 'manage'"></view>
 				</view>
-			</scroll-view>
+				<view class="topTab" :class="{ active: activeGroup === 'discover' }" @tap="setActiveGroup('discover')">
+					<text class="topTabText">发现家长圈</text>
+					<view class="topTabLine" v-if="activeGroup === 'discover'"></view>
+				</view>
+			</view>
+
+			<view class="filters">
+				<picker mode="selector" :range="sortOptions" range-key="label" @change="onSortChange">
+					<view class="filterPill">
+						<text class="filterText">{{ currentSortLabel }}</text>
+						<text class="filterArrow">▼</text>
+					</view>
+				</picker>
+				<picker mode="selector" :range="categoryOptions" range-key="label" @change="onCategoryChange">
+					<view class="filterPill">
+						<text class="filterText">{{ currentCategoryLabel }}</text>
+						<text class="filterArrow">▼</text>
+					</view>
+				</picker>
+			</view>
 		</view>
 
 		<view class="list">
-			<view class="post" v-for="(p, index) in filteredPosts" :key="p.id">
+			<view class="post" v-for="(p, index) in displayedPosts" :key="p.id">
 				<view class="postHeader">
 					<view class="avatar" :style="{ background: getAvatarColor(index) }" @tap="openPost(p)">
 						<text class="avatarTxt">{{ p.authorInitial || 'A' }}</text>
@@ -73,9 +89,9 @@
 				</view>
 			</view>
 
-			<view class="empty" v-if="filteredPosts.length === 0">
+			<view class="empty" v-if="displayedPosts.length === 0">
 				<text class="emptyTitle">暂时没有内容</text>
-				<text class="emptyDesc">先看看其它分区，或发一条问题</text>
+				<text class="emptyDesc">{{ activeGroup === 'manage' ? '还没有创建帖子' : '先看看其它内容，或发一条问题' }}</text>
 			</view>
 		</view>
 
@@ -101,8 +117,10 @@
 	} from '@/libs/login.js'
 	import {
 		getForumPosts,
+		getForumMyPosts,
 		deleteForumPost,
-		toggleForumPostLike
+		toggleForumPostLike,
+		siteConfig
 	} from '@/api/api.js'
 	import {
 		LOGIN_STATUS,
@@ -190,21 +208,44 @@
 				pdHeight: 0,
 				showBar: false,
 				sysHeight: sysHeight,
-				activeTab: 'kinder',
-				tabIntoView: 'tab_kinder',
-				tabs: FORUM_TABS,
+				activeGroup: 'discover',
+				sortKey: 'default',
+				categoryKey: 'all',
 				posts: [],
 				page: 1,
 				limit: 20,
 				innerActionAt: 0,
 				innerActionPostId: 0,
-				likePendingMap: {}
+				likePendingMap: {},
+				forumEnabled: true,
+				forumChecked: false
 			}
 		},
 		onShow() {
-			this.loadPosts()
+			this.ensureForumEnabled().then((ok) => {
+				if (ok) this.loadPosts()
+			})
 		},
 		computed: {
+			sortOptions() {
+				return [
+					{ key: 'default', label: '综合排序' },
+					{ key: 'new', label: '最新发布' },
+					{ key: 'hot', label: '最热' },
+					{ key: 'comment', label: '最多评论' }
+				]
+			},
+			categoryOptions() {
+				return [{ key: 'all', label: '全部' }].concat(FORUM_TABS.map(t => ({ key: t.key, label: t.name })))
+			},
+			currentSortLabel() {
+				const found = this.sortOptions.find(o => o.key === this.sortKey)
+				return found ? found.label : '综合排序'
+			},
+			currentCategoryLabel() {
+				const found = this.categoryOptions.find(o => o.key === this.categoryKey)
+				return found ? found.label : '全部'
+			},
 			currentUser() {
 				const uidValue = Cache.get(UID) || 0
 				const userRaw = Cache.get(USER_INFO)
@@ -223,19 +264,64 @@
 				}
 				return {}
 			},
-			filteredPosts() {
-				return this.posts.slice().sort((a, b) => toUnixSeconds(b.add_time || b.createdAtTs || b.createdAt) - toUnixSeconds(a.add_time || a.createdAtTs || a.createdAt))
+			displayedPosts() {
+				let list = Array.isArray(this.posts) ? this.posts.slice() : []
+				if (this.categoryKey !== 'all') {
+					list = list.filter(p => p && p.tab === this.categoryKey)
+				}
+				if (this.sortKey === 'hot') {
+					return list.sort((a, b) => {
+						const av = (Number(a.views) || 0) + (Number(a.likes) || 0) + (Number(a.comments) || 0)
+						const bv = (Number(b.views) || 0) + (Number(b.likes) || 0) + (Number(b.comments) || 0)
+						return bv - av
+					})
+				}
+				if (this.sortKey === 'comment') {
+					return list.sort((a, b) => (Number(b.comments) || 0) - (Number(a.comments) || 0))
+				}
+				return list.sort((a, b) => toUnixSeconds(b.add_time || b.createdAtTs || b.createdAt) - toUnixSeconds(a.add_time || a.createdAtTs || a.createdAt))
 			}
 		},
 		methods: {
+			ensureForumEnabled() {
+				if (this.forumChecked) return Promise.resolve(!!this.forumEnabled)
+				return siteConfig().then((res) => {
+					const d = res && res.data ? res.data : {}
+					const enabled = Number(d.forum_enabled || 0) === 1
+					this.forumEnabled = enabled
+					this.forumChecked = true
+					if (!enabled) {
+						uni.redirectTo({
+							url: '/pages/forum/closed'
+						})
+					}
+					return enabled
+				}).catch(() => {
+					this.forumEnabled = false
+					this.forumChecked = true
+					uni.redirectTo({
+						url: '/pages/forum/closed'
+					})
+					return false
+				})
+			},
 			noop() {},
 			async loadPosts() {
 				try {
-					const res = await getForumPosts({
-						tab: this.activeTab,
-						page: this.page,
-						limit: this.limit
-					})
+					let res
+					if (this.activeGroup === 'manage') {
+						res = await getForumMyPosts({
+							page: this.page,
+							limit: this.limit
+						})
+					} else {
+						const params = {
+							page: this.page,
+							limit: this.limit
+						}
+						if (this.categoryKey !== 'all') params.tab = this.categoryKey
+						res = await getForumPosts(params)
+					}
 					const data = res && res.data ? res.data : {}
 					const list = Array.isArray(data.list) ? data.list : []
 					this.posts = list.map((p) => ({
@@ -252,12 +338,27 @@
 					})
 				}
 			},
-			setActiveTab(key) {
-				if (this.activeTab === key) return
-				this.activeTab = key
-				this.tabIntoView = 'tab_' + key
+			setActiveGroup(groupKey) {
+				if (this.activeGroup === groupKey) return
+				if (groupKey === 'manage' && !Cache.get(LOGIN_STATUS)) {
+					toLogin()
+					return
+				}
+				this.activeGroup = groupKey
 				this.page = 1
 				this.loadPosts()
+			},
+			onSortChange(e) {
+				const idx = Number(e && e.detail ? e.detail.value : 0) || 0
+				const opt = this.sortOptions[idx]
+				this.sortKey = opt && opt.key ? opt.key : 'default'
+			},
+			onCategoryChange(e) {
+				const idx = Number(e && e.detail ? e.detail.value : 0) || 0
+				const opt = this.categoryOptions[idx]
+				this.categoryKey = opt && opt.key ? opt.key : 'all'
+				this.page = 1
+				if (this.activeGroup === 'discover') this.loadPosts()
 			},
 			newDataStatus(val, num) {
 				this.isFooter = !!val
@@ -434,54 +535,68 @@
 		padding: 20rpx 24rpx 10rpx;
 	}
 
-	.slogan {
-		display: block;
-		font-size: 26rpx;
-		color: rgba(31, 35, 41, 0.6);
-		margin-bottom: 24rpx;
-		padding-left: 8rpx;
-		letter-spacing: 1rpx;
-	}
-
-	.tabsScroll {
-		width: 100%;
-		white-space: nowrap;
-	}
-
-	.tabs {
+	.topTabs {
 		display: flex;
-		gap: 5rpx;
-		padding: 0 8rpx 12rpx;
-		padding-right: 160rpx;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 8rpx;
 	}
 
-	.tab {
+	.topTab {
 		position: relative;
-		padding: 10rpx 0;
-		flex: none;
+		padding: 10rpx 0 16rpx;
+		flex: 1;
+		text-align: center;
 	}
 
-	.tabText {
-		font-size: 28rpx;
-		color: rgba(31, 35, 41, 0.6);
-		transition: all 0.2s;
-	}
-
-	.tab.active .tabText {
+	.topTabText {
 		font-size: 30rpx;
+		color: rgba(31, 35, 41, 0.65);
+		font-weight: 600;
+	}
+
+	.topTab.active .topTabText {
+		color: var(--view-theme);
 		font-weight: 800;
+	}
+
+	.topTabLine {
+		position: absolute;
+		left: 50%;
+		bottom: 6rpx;
+		transform: translateX(-50%);
+		width: 56rpx;
+		height: 6rpx;
+		border-radius: 99rpx;
+		background: var(--view-theme);
+	}
+
+	.filters {
+		display: flex;
+		align-items: center;
+		gap: 16rpx;
+		padding: 14rpx 8rpx 0;
+	}
+
+	.filterPill {
+		display: flex;
+		align-items: center;
+		gap: 10rpx;
+		padding: 12rpx 18rpx;
+		border-radius: 999rpx;
+		background: rgba(255, 255, 255, 0.9);
+		border: 1rpx solid rgba(0, 0, 0, 0.06);
+	}
+
+	.filterText {
+		font-size: 26rpx;
 		color: #1f2329;
 	}
 
-	.tabLine {
-		position: absolute;
-		bottom: 0;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 40rpx;
-		height: 6rpx;
-		background: linear-gradient(90deg, #ff9a9e 0%, #fad0c4 100%);
-		border-radius: 4rpx;
+	.filterArrow {
+		font-size: 22rpx;
+		color: rgba(31, 35, 41, 0.5);
+		transform: translateY(-1rpx);
 	}
 
 	.list {

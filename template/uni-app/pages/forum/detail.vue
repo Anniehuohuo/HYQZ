@@ -87,7 +87,8 @@
 		toggleForumPostLike,
 		createForumComment,
 		deleteForumPost,
-		deleteForumComment
+		deleteForumComment,
+		siteConfig
 	} from '@/api/api.js'
 	import {
 		LOGIN_STATUS,
@@ -200,7 +201,9 @@
 				draft: '',
 				liked: false,
 				shareCover: '',
-				likePending: false
+				likePending: false,
+				forumEnabled: true,
+				forumChecked: false
 			}
 		},
 		computed: {
@@ -240,6 +243,35 @@
 			}
 		},
 		onLoad(options) {
+			this.ensureForumEnabled().then((ok) => {
+				if (!ok) return
+				this.initPage(options)
+			})
+		},
+		methods: {
+			ensureForumEnabled() {
+				if (this.forumChecked) return Promise.resolve(!!this.forumEnabled)
+				return siteConfig().then((res) => {
+					const d = res && res.data ? res.data : {}
+					const enabled = Number(d.forum_enabled || 0) === 1
+					this.forumEnabled = enabled
+					this.forumChecked = true
+					if (!enabled) {
+						uni.redirectTo({
+							url: '/pages/forum/closed'
+						})
+					}
+					return enabled
+				}).catch(() => {
+					this.forumEnabled = false
+					this.forumChecked = true
+					uni.redirectTo({
+						url: '/pages/forum/closed'
+					})
+					return false
+				})
+			},
+			initPage(options) {
 			let postId = ''
 			if (options) {
 				postId = options.id || options.postId || options.post_id || ''
@@ -282,7 +314,7 @@
 				}
 			})
 			//#endif
-		},
+			},
 		//#ifdef MP
 		onShareAppMessage() {
 			if (!this.post) return {}
@@ -303,7 +335,6 @@
 			}
 		},
 		//#endif
-		methods: {
 			async loadPost() {
 				if (!this.postId) {
 					this.post = null

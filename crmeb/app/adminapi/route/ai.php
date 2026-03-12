@@ -16,6 +16,20 @@ Route::group('ai', function () {
     Route::put('agents/:id', 'v1.ai.AiAgent/update')->option(['real_name' => '编辑智能体']);
     Route::delete('agents/:id', 'v1.ai.AiAgent/delete')->option(['real_name' => '删除智能体']);
     Route::put('agents/set_status/:id/:status', 'v1.ai.AiAgent/setStatus')->option(['real_name' => '修改智能体状态']);
+    Route::post('agents/auto_bind_goods', 'v1.ai.AiAgent/autoBindGoods')->option(['real_name' => '自动补齐智能体售卖绑定']);
+    Route::get('agents/:id/kb_docs', 'v1.ai.AiAgent/kbDocs')->option(['real_name' => '获取中台知识文档']);
+    Route::post('agents/:id/kb_docs/import', 'v1.ai.AiAgent/importKbDoc')->option(['real_name' => '导入中台知识文档']);
+    Route::delete('agents/:id/kb_docs/:doc_id', 'v1.ai.AiAgent/deleteKbDoc')->option(['real_name' => '删除中台知识文档']);
+
+    Route::get('power_user/give_form/:uid', 'v1.ai.AiPowerUser/giveForm')->option(['real_name' => '赠送算力表单']);
+    Route::put('power_user/give/:uid', 'v1.ai.AiPowerUser/give')->option(['real_name' => '赠送算力']);
+
+    Route::get('power_config', 'v1.ai.AiPowerConfig/get')->option(['real_name' => '算力配置']);
+    Route::post('power_config', 'v1.ai.AiPowerConfig/save')->option(['real_name' => '保存算力配置']);
+
+    Route::get('qingyan_config', 'v1.ai.QingyanConfig/get')->option(['real_name' => '获取清言配置']);
+    Route::post('qingyan_config', 'v1.ai.QingyanConfig/save')->option(['real_name' => '保存清言配置']);
+    Route::post('qingyan_config/verify', 'v1.ai.QingyanConfig/verify')->option(['real_name' => '验证清言智能体']);
 })->middleware([
     \app\http\middleware\AllowOriginMiddleware::class,
     \app\adminapi\middleware\AdminAuthTokenMiddleware::class,

@@ -126,6 +126,7 @@ class PublicController
         $data['icp_url'] = sys_config('icp_url');
         $data['network_security'] = sys_config('network_security');
         $data['network_security_url'] = sys_config('network_security_url');
+        $data['forum_enabled'] = (int)sys_config('forum_enabled', 0) ? 1 : 0;
         return app('json')->success($data);
     }
 
@@ -180,10 +181,21 @@ class PublicController
         $auth['/pages/users/user_invoice_list/index'] = $invoiceStatus;
         $auth['/pages/annex/vip_paid/index'] = $svipOpen;
         $auth['/kefu/mobile_list'] = $userService;
+        $forumEnabled = (int)sys_config('forum_enabled', 0) ? 1 : 0;
         foreach ($menusInfo as $key => &$value) {
             if ($value['url'] == '/pages/users/user_spread_user/index' && $auth['/pages/annex/settled/index']) {
                 $value['name'] = '分销申请';
                 $value['url'] = '/pages/annex/settled/index';
+            }
+            if (!$forumEnabled && isset($value['url']) && is_string($value['url'])) {
+                $u = trim((string)$value['url']);
+                if (strpos($u, 'pages/forum/') === 0) $u = '/' . $u;
+                if (strpos($u, '/pages/forum/') === 0) {
+                    $value['url'] = '/pages/parents_classroom/index';
+                    if (isset($value['name']) && is_string($value['name'])) {
+                        $value['name'] = '家长课堂';
+                    }
+                }
             }
             if (isset($auth[$value['url']]) && !$auth[$value['url']]) {
                 unset($menusInfo[$key]);
@@ -196,6 +208,7 @@ class PublicController
                 }
             }
         }
+        unset($value);
         /** @var SystemConfigServices $systemConfigServices */
         $systemConfigServices = app()->make(SystemConfigServices::class);
         $bannerInfo = $systemConfigServices->getSpreadBanner() ?? [];

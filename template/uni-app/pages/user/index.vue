@@ -1,5 +1,5 @@
 <template>
-	<view class="new-users copy-data bg-mesh" :style="{ height: pageHeight }">
+	<view class="new-users copy-data bg-mesh" :style="[colorStyle, { height: pageHeight }]">
 		<view class="top">
 			<!-- #ifdef MP || APP-PLUS -->
 			<view class="sys-head">
@@ -13,258 +13,96 @@
 		</view>
 		<view class="mid" style="flex: 1; overflow: hidden">
 			<scroll-view scroll-y="true" style="height: 100%">
-				<view class="head">
-					<view class="user-card" :class="member_style == 3 ? 'unBg' : ''">
-						<view class="bg"></view>
-						<view class="user-info">
-							<view>
-								<!-- 注释这个是加的bnt -->
-								<!-- #ifdef H5 -->
-								<!-- <button class="bntImg" v-if="userInfo.is_complete == 0 && isWeixin"
-									@click="getWechatuserinfo">
-									<image class="avatar" src='/static/images/f.png'></image>
-									<view class="avatarName">{{$t('获取头像')}}</view>
-								</button> -->
-								<!-- #endif -->
-								<!-- #ifndef APP-PLUS -->
-								<view class="avatar-box" :class="{ on: userInfo.is_money_level }">
-									<image class="avatar" :src="userInfo.avatar" v-if="userInfo.avatar" @click="goEdit()"></image>
-									<image v-else class="avatar" src="/static/images/f.png" mode="" @click="goEdit()"></image>
-									<view class="headwear" v-if="userInfo.is_money_level && userInfo.svip_open">
-										<image src="/static/images/headwear.png"></image>
-									</view>
-								</view>
-								<!-- #endif -->
-								<!-- #ifdef APP-PLUS -->
-								<view class="avatar-box" :class="{ on: userInfo.is_money_level }">
-									<image class="avatar" :src="userInfo.avatar" v-if="userInfo.avatar" @click="goEdit()"></image>
-									<image v-else class="avatar" src="/static/images/f.png" mode="" @click="goEdit()"></image>
-									<view class="headwear" v-if="userInfo.is_money_level && userInfo.svip_open">
-										<image src="/static/images/headwear.png"></image>
-									</view>
-								</view>
-								<!-- #endif -->
-							</view>
-							<view class="info">
-								<!-- #ifdef MP || APP-PLUS -->
-								<view class="name" v-if="!userInfo.uid" @click="openAuto" style="height: 100%; display: flex; align-items: center">
-									{{ $t('请点击授权') }}
-								</view>
-								<!-- #endif -->
-								<!-- #ifdef H5 -->
-								<view class="name" v-if="!userInfo.uid" @click="openAuto" style="height: 100%; display: flex; align-items: center">
-									{{ $t(isWeixin ? '请点击授权' : '请点击登录') }}
-								</view>
-								<!-- #endif -->
-								<view class="name" v-if="userInfo.uid">
-									<text class="line1 nickname">{{ userInfo.nickname }}</text>
-									<image class="live" :src="userInfo.vip_icon" v-if="userInfo.vip_icon"></image>
-									<view class="vip" v-if="userInfo.is_money_level > 0 && userInfo.svip_open">
-										<image src="/static/images/svip.png"></image>
-									</view>
-								</view>
-								<view class="num" v-if="userInfo.phone" @click="goEdit()">
-									<view class="num-txt">{{ userInfo.phone }}</view>
-								</view>
-								<!-- #ifdef MP -->
-								<button class="phone" v-if="!userInfo.phone && isLogin" open-type="getPhoneNumber" @getphonenumber="getphonenumber">{{ $t(`绑定手机号`) }}</button>
-								<!-- #endif -->
-								<!-- #ifndef MP -->
-								<view class="phone" v-if="!userInfo.phone && isLogin" @tap="bindPhone">
-									{{ $t('绑定手机号') }}
-								</view>
-								<!-- #endif -->
-							</view>
-							<view class="message">
-								<navigator v-if="isLogin" url="/pages/users/user_info/index" hover-class="none">
-									<view class="iconfont icon-shezhi"></view>
-								</navigator>
-							</view>
-							<view class="message">
-								<navigator v-if="isLogin" url="/pages/users/message_center/index" hover-class="none">
-									<view v-if="userInfo.service_num" class="num">
-										{{ userInfo.service_num >= 100 ? '99+' : userInfo.service_num }}
-									</view>
-									<view class="iconfont icon-s-kefu"></view>
-								</navigator>
-							</view>
-							<!-- #ifdef MP -->
-							<!-- <view class="setting" @click="Setting"><text class="iconfont icon-shezhi"></text></view> -->
-							<!-- #endif -->
+				<view class="ucHeader">
+					<view class="ucHeaderLeft" @click="goEdit()">
+						<view class="ucAvatar">
+							<image class="ucAvatarImg" :src="userInfo.avatar" v-if="userInfo.avatar"></image>
+							<image v-else class="ucAvatarImg" src="/static/images/f.png"></image>
 						</view>
-						<view class="num-wrapper">
-							<view class="num-item" v-if="userInfo.balance_func_status" @click="goMenuPage('/pages/users/user_money/index')">
-								<text class="num">{{ userInfo.now_money || 0 }}</text>
-								<view class="txt">{{ $t('余额') }}</view>
+						<view class="ucHeaderInfo">
+							<view class="ucNameRow" v-if="isLogin">
+								<view class="ucName">{{ userInfo.nickname || '用户' }}</view>
+								<view class="ucLevelTag">Lv.1</view>
 							</view>
-							<view class="num-item" v-else @click="goMenuPage('/pages/users/user_goods_collection/index')">
-								<text class="num">{{ userInfo.collectCount || 0 }}</text>
-								<view class="txt">{{ $t('收藏') }}</view>
+							<view class="ucNameRow" v-else>
+								<view class="ucName">{{ $t('请点击登录') }}</view>
 							</view>
-							<view class="num-item" @click="goMenuPage('/pages/users/user_coupon/index')">
-								<text class="num">{{ userInfo.couponCount || 0 }}</text>
-								<view class="txt">{{ $t('优惠券') }}</view>
-							</view>
-							<view class="num-item" @click="goMenuPage('/pages/users/user_integral/index')">
-								<text class="num">{{ userInfo.integral || 0 }}</text>
-								<view class="txt">{{ $t('积分') }}</view>
-							</view>
-						</view>
-						<!-- <view class="sign" @click="goSignIn">签到</view> -->
-						<view class="cardVipA acea-row row-between-wrapper" v-if="userInfo.svip_open && member_style == 1">
-							<view class="left-box">
-								<view v-if="userInfo.vip_status == 1" class="small">{{ $t('永久') }}</view>
-								<view v-else-if="userInfo.vip_status == 3" class="small">
-									{{ $t('会员到期') }}
-									{{ userInfo.overdue_time | dateFormat }}
-								</view>
-								<view v-else-if="userInfo.vip_status == -1" class="small">{{ $t('已过期') }}</view>
-								<view v-else-if="userInfo.vip_status == 2" class="small">{{ $t('未开通会员') }}</view>
-							</view>
-							<view class="acea-row row-middle">
-								<navigator v-if="userInfo.vip_status == 1" url="/pages/annex/vip_paid/index" hover-class="none" class="btn">{{ $t('查看会员权益') }}</navigator>
-								<navigator v-else url="/pages/annex/vip_paid/index" hover-class="none" class="btn">
-									{{ userInfo.overdue_time ? $t('立即续费') : $t('立即激活') }}
-								</navigator>
-								<text class="iconfont icon-jiantou"></text>
-							</view>
-						</view>
-						<view class="cardVipB acea-row row-between" v-if="userInfo.svip_open && member_style == 3">
-							<view class="left-box acea-row">
-								<view class="pictrue">
-									<image src="../../static/images/member01.png"></image>
-								</view>
-								<view v-if="userInfo.vip_status == 1" class="small">{{ $t('永久') }}</view>
-								<view v-else-if="userInfo.vip_status == 3" class="small">
-									{{ $t('会员到期') }}
-									{{ userInfo.overdue_time | dateFormat }}
-								</view>
-								<view v-else-if="userInfo.vip_status == -1" class="small">{{ $t('已过期') }}</view>
-								<view v-else-if="userInfo.vip_status == 2" class="small">{{ $t('未开通会员') }}</view>
-							</view>
-							<view class="acea-row">
-								<navigator v-if="userInfo.vip_status == 1" url="/pages/annex/vip_paid/index" hover-class="none" class="btn">{{ $t('会员可享多项权益') }}</navigator>
-								<navigator v-else url="/pages/annex/vip_paid/index" hover-class="none" class="btn">
-									{{ userInfo.overdue_time ? $t('立即续费') : $t('立即激活') }}
-								</navigator>
-								<text class="iconfont icon-jiantou btn"></text>
-							</view>
+							<view class="ucPhone" v-if="isLogin">{{ userInfo.phone || '' }}</view>
+							<view class="ucPhone" v-else>{{ $t('未登录') }}</view>
 						</view>
 					</view>
-					<view class="card-vip" v-if="userInfo.svip_open && member_style == 2">
-						<view class="left-box">
-							<view class="big">{{ $t('会员可享多项权益') }}</view>
-							<view v-if="userInfo.vip_status == 1" class="small">{{ $t('永久') }}</view>
-							<view v-else-if="userInfo.vip_status == 3" class="small">
-								{{ $t('会员到期') }}
-								{{ userInfo.overdue_time | dateFormat }}
-							</view>
-							<view v-else-if="userInfo.vip_status == -1" class="small">{{ $t('已过期') }}</view>
-							<view v-else-if="userInfo.vip_status == 2" class="small">{{ $t('未开通会员') }}</view>
+					<view class="ucHeaderRight">
+						<view class="ucIconBtn" @click="goMenuPage('/pages/users/user_info/index')">
+							<text class="iconfont icon-shezhi"></text>
 						</view>
-						<navigator v-if="userInfo.vip_status == 1" url="/pages/annex/vip_paid/index" hover-class="none" class="btn">
-							{{ $t('查看会员权益') }}
-						</navigator>
-						<navigator v-else url="/pages/annex/vip_paid/index" hover-class="none" class="btn">
-							{{ userInfo.overdue_time ? $t('立即续费') : $t('立即激活') }}
-						</navigator>
-					</view>
-					<view class="order-wrapper" :class="userInfo.svip_open ? '' : 'height'">
-						<view class="order-hd flex">
-							<view class="left">{{ $t('订单中心') }}</view>
-							<view class="right flex" @click="goMenuPage('/pages/goods/order_list/index')" >
-								{{ $t('查看全部') }}
-								<text class="iconfont icon-jiantou"></text>
-							</view>
-						</view>
-						<view class="order-bd">
-							<block v-for="(item, index) in orderMenu" :key="index">
-								<view class="order-item" @click="goMenuPage(item.url)">
-									<view class="pic">
-										<!-- <image :src="item.img" mode=""></image> -->
-										<text class="iconfont" :class="item.img"></text>
-										<text class="order-status-num" v-if="item.num > 0">{{ item.num }}</text>
-									</view>
-									<view class="txt">{{ $t(item.title) }}</view>
-								</view>
-							</block>
+						<view class="ucIconBtn" @click="goMenuPage('/pages/users/message_center/index')">
+							<text class="iconfont icon-s-kefu"></text>
+							<view class="ucDot" v-if="userInfo.service_num"></view>
 						</view>
 					</view>
 				</view>
-				<!-- 轮播 -->
-				<view class="slider-wrapper" v-if="imgUrls.length > 0 && my_banner_status">
-					<swiper
-						indicator-dots="true"
-						:autoplay="autoplay"
-						:circular="circular"
-						:interval="interval"
-						:duration="duration"
-						indicator-color="rgba(255,255,255,0.6)"
-						indicator-active-color="#fff"
-					>
-						<block v-for="(item, index) in imgUrls" :key="index">
-							<swiper-item>
-								<view @click="goPages(item.url)" class="slide-navigator acea-row row-between-wrapper" hover-class="none">
-									<image :src="item.pic" class="slide-image"></image>
-								</view>
-							</swiper-item>
-						</block>
-					</swiper>
-				</view>
-				<!-- 会员菜单 -->
-				<view class="user-menus" style="margin-top: 20rpx" v-if="my_menus_status">
-					<view class="menu-title" v-if="my_menus_status == 1">{{ $t('我的服务') }}</view>
-					<view :class="{ 'list-box': my_menus_status == 1, 'column-box': my_menus_status == 2 }">
-						<!-- #ifdef APP-PLUS || H5 -->
-						<block v-for="(item, index) in MyMenus" :key="index">
-							<view class="item" v-if="item.url != '#' && item.url != '/pages/service/index'" @click="goMenuPage(item.url, item.name)">
-								<image :src="item.pic"></image>
-								<text class="name">{{ $t(item.name) }}</text>
-								<text class="iconfont icon-jiantou" v-if="my_menus_status == 2"></text>
-							</view>
-						</block>
-						<!-- #endif -->
-						<!-- #ifdef MP -->
-						<block v-for="(item, index) in MyMenus" :key="index">
-							<view
-								class="item"
-								v-if="
-									(item.url != '#' && item.url != '/pages/service/index' && item.url != '/pages/extension/customer_list/chat') ||
-									(item.url == '/pages/extension/customer_list/chat' && routineContact == 0)
-								"
-								@click="goMenuPage(item.url, item.name)"
-							>
-								<image :src="item.pic"></image>
-								<text class="name">{{ $t(item.name) }}</text>
-								<text class="iconfont icon-jiantou" v-if="my_menus_status == 2"></text>
-							</view>
-						</block>
 
-						<button class="item" open-type="contact" v-if="routineContact == 1">
-							<image src="/static/images/contact.png"></image>
-							<text class="name">{{ $t('联系客服') }}</text>
-							<text class="iconfont icon-jiantou" v-if="my_menus_status == 2"></text>
-						</button>
-						<!-- #endif -->
-						<!-- #ifdef APP-PLUS -->
-						<view class="item" hover-class="none" @click="goMenuPage('/pages/users/privacy/index?type=3')">
-							<image src="/static/images/menu.png"></image>
-							<text class="name">{{ $t('隐私协议') }}</text>
-							<text class="iconfont icon-jiantou" v-if="my_menus_status == 2"></text>
+				<view class="ucPowerWrap" v-if="isLogin">
+					<view class="ucPowerCard">
+						<view class="ucPowerGlow"></view>
+						<view class="ucPowerTop">
+							<view class="ucPowerTitle">我的算力</view>
+							<view class="ucPowerBadge" v-if="aiPower.enabled">今日免费剩余 {{ aiPower.free_remaining || 0 }}/{{ aiPower.free_limit || 0 }}</view>
 						</view>
-						<!-- #endif -->
+						<view class="ucPowerBottom">
+							<view class="ucPowerAmount">
+								<view class="ucPowerRow">
+									<text class="ucPowerNum">{{ aiPower.balance || 0 }}</text>
+									<text class="ucPowerUnit2">点</text>
+								</view>
+								<view class="ucPowerTip">超出后每次消耗 {{ aiPower.cost_per_chat || 1 }} 点</view>
+							</view>
+							<view class="ucPowerBtn" @click="goMenuPage('/pages/users/ai_power_payment/index')">充值算力</view>
+						</view>
 					</view>
 				</view>
-				<view class="user-menus" style="margin-top: 20rpx" v-if="business_status && storeMenu.length">
-					<view class="menu-title" v-if="business_status == 1">{{ $t('商家管理') }}</view>
-					<view :class="{ 'list-box': business_status == 1, 'column-box': business_status == 2 }">
-						<block v-for="(item, index) in storeMenu" :key="index">
-							<view class="item" :url="item.url" hover-class="none" v-if="item.url != '#' && item.url != '/pages/service/index'" @click="goMenuPage(item.url, item.name)">
-								<image :src="item.pic"></image>
-								<text class="name">{{ $t(item.name) }}</text>
-								<text class="iconfont icon-jiantou" v-if="business_status == 2"></text>
+
+				<view class="ucTabs2">
+					<view class="ucTab2" v-for="tab in tabs" :key="tab" :class="{ on: activeTab === tab }" @click="activeTab = tab">
+						<view class="ucTab2Text">{{ tab }}</view>
+						<view class="ucTab2Line" v-if="activeTab === tab"></view>
+					</view>
+				</view>
+
+				<view class="ucBody">
+					<view class="ucGroups">
+						<view class="ucGroup" v-for="(group, gIdx) in currentGroups" :key="gIdx">
+							<view class="ucGroupTitle">{{ group.title }}</view>
+							<view class="ucGroupCard">
+								<block v-for="(item, iIdx) in group.items" :key="iIdx">
+									<view class="ucItem" :class="{ last: iIdx === group.items.length - 1 }" @click="onUcItem(item)">
+										<view class="ucItemLeft">
+											<view class="ucItemIcon" :style="{ background: item.bg || 'rgba(241, 165, 92, 0.12)', color: 'var(--view-theme)' }">
+												<text class="iconfont" :class="item.icon"></text>
+											</view>
+											<view class="ucItemName">{{ item.name }}</view>
+										</view>
+										<view class="ucItemRight">
+											<view class="ucItemExtra" v-if="item.extra">{{ item.extra }}</view>
+											<text class="iconfont icon-jiantou ucItemArrow"></text>
+										</view>
+									</view>
+								</block>
+								<!-- #ifdef MP -->
+								<button class="ucItem ucBtnItem" open-type="contact" v-if="group.contact">
+									<view class="ucItemLeft">
+										<view class="ucItemIcon" :style="{ background: 'rgba(241, 165, 92, 0.12)', color: 'var(--view-theme)' }">
+											<text class="iconfont icon-s-kefu"></text>
+										</view>
+										<view class="ucItemName">{{ $t('联系客服') }}</view>
+									</view>
+									<view class="ucItemRight">
+										<text class="iconfont icon-jiantou ucItemArrow"></text>
+									</view>
+								</button>
+								<!-- #endif -->
 							</view>
-						</block>
+						</view>
 					</view>
 				</view>
 				<view class="uni-p-b-98"></view>
@@ -278,6 +116,7 @@
 let sysHeight = uni.getSystemInfoSync().statusBarHeight + 'px';
 import { getMenuList, getUserInfo, setVisit, mpBindingPhone } from '@/api/user.js';
 import { wechatAuthV2, silenceAuth } from '@/api/public.js';
+import { getAiPowerQuota } from '@/api/ai_power.js';
 import { toLogin } from '@/libs/login.js';
 import { mapState, mapGetters } from 'vuex';
 // #ifdef H5
@@ -300,7 +139,12 @@ export default {
 		...mapGetters({
 			cartNum: 'cartNum',
 			isLogin: 'isLogin'
-		})
+		}),
+		currentGroups() {
+			if (this.activeTab === '我的管理') return this.buildManageGroups();
+			if (this.activeTab === '我的共创') return this.buildCocreateGroups();
+			return this.buildCourseGroups();
+		}
 	},
 	filters: {
 		coundTime(val) {
@@ -356,6 +200,14 @@ export default {
 			isShowAuth: false, //是否隐藏授权
 			orderStatusNum: {},
 			userInfo: {},
+			aiPower: {
+				enabled: 0,
+				free_limit: 3,
+				free_used: 0,
+				free_remaining: 3,
+				cost_per_chat: 1,
+				balance: 0
+			},
 			MyMenus: [],
 			sysHeight: sysHeight,
 			mpHeight: 0,
@@ -377,7 +229,9 @@ export default {
 			member_style: 0,
 			my_banner_status: 0,
 			is_diy: uni.getStorageSync('is_diy'),
-			copyRightPic: '/static/images/support.png'
+			copyRightPic: '/static/images/support.png',
+			tabs: ['我的智能体', '我的共创', '我的管理'],
+			activeTab: '我的管理'
 		};
 	},
 	onLoad(option) {
@@ -553,12 +407,147 @@ export default {
 							break;
 					}
 				});
+				getAiPowerQuota().then((r) => {
+					that.aiPower = r.data || that.aiPower
+				}).catch(() => {})
 				uni.stopPullDownRefresh();
 			});
 		},
 		//小程序授权api替换 getUserInfo
 		getUserProfile() {
 			toLogin();
+		},
+		onUcItem(item) {
+			if (!item) return;
+			if (item.url && typeof item.url === 'string' && (/^\/?pages\/forum\//.test(item.url.trim()))) {
+				return this.goMenuPage('/pages/parents_classroom/index', '家长课堂');
+			}
+			if (item.url && typeof item.url === 'string' && item.url.trim() === '/pages/annex/vip_paid/index') {
+				return uni.showToast({ title: '该功能暂未开放', icon: 'none' });
+			}
+			if (item.url) return this.goMenuPage(item.url, item.name || '');
+			if (item.action === 'aiPower') return this.goMenuPage('/pages/users/ai_power_payment/index');
+			if (item.action === 'course') return this.goMenuPage('/pages/ai/agents?onlyUnlocked=1&title=我的智能体');
+		},
+		promoItems() {
+			const money = this.userInfo && (this.userInfo.commissionCount || this.userInfo.commission_count) ? (this.userInfo.commissionCount || this.userInfo.commission_count) : '0.00';
+			return [
+				{
+					name: '我的推广',
+					icon: 'icon-ic_gift1',
+					url: '/pages/users/user_spread_user/index'
+				},
+				{
+					name: '推广收益',
+					icon: 'icon-ic_fire',
+					extra: '¥ ' + money,
+					url: '/pages/users/user_spread_money/index?type=2'
+				},
+				{
+					name: '推广规则',
+					icon: 'icon-a-ic_Imageandtextsorting',
+					url: '/pages/users/user_distribution_level/index'
+				}
+			];
+		},
+		buildCourseGroups() {
+			return [
+				{
+					title: '智能体',
+					items: [
+						{ name: '已解锁智能体', icon: 'icon-ic_fire', url: '/pages/ai/agents?onlyUnlocked=1&title=我的智能体' }
+					]
+				}
+			];
+		},
+		buildCocreateGroups() {
+			return [
+				{
+					title: '推广中心',
+					items: this.promoItems()
+				}
+			];
+		},
+		buildManageGroups() {
+			const groups = [
+				{
+					title: '智能体',
+					items: [
+						{ name: '我的智能体', icon: 'icon-ic_fire', url: '/pages/ai/agents?onlyUnlocked=1&title=我的智能体' }
+					]
+				},
+				{
+					title: '推广中心',
+					items: this.promoItems()
+				},
+				{
+					title: '常用管理',
+					items: [
+						{ name: '个人资料', icon: 'icon-ic-complete1', url: '/pages/users/user_info/index' },
+						{ name: '消息中心', icon: 'icon-ic_increase-2', url: '/pages/users/message_center/index' },
+						{ name: '隐私协议', icon: 'icon-ic_close1', url: '/pages/users/privacy/index?type=3' }
+					]
+				}
+			];
+
+			const moreItems = [
+				{ name: '我的算力', icon: 'icon-ic_fire', action: 'aiPower' },
+				{ name: '账号管理', icon: 'icon-ic_close1', url: '/pages/users/user_info/index' }
+			];
+
+			if (this.MyMenus && this.MyMenus.length) {
+				const dynamic = this.MyMenus
+					.filter(
+						it =>
+							it &&
+							it.url &&
+							it.url !== '#' &&
+							it.url !== '/pages/service/index' &&
+							it.url !== '/pages/goods/order_list/index' &&
+							it.url !== '/pages/users/user_return_list/index' &&
+							it.url !== '/pages/annex/vip_paid/index' &&
+							String(it.name || '').indexOf('付费会员') === -1 &&
+							String(it.name || '').indexOf('会员权益') === -1
+					)
+					.map(it => ({
+						name: it.name,
+						icon: 'icon-ic_gift1',
+						url: it.url
+					}));
+				const forumItems = dynamic.filter(it => it && (it.name === '我的论坛' || it.url === '/pages/forum/me'));
+				const otherItems = dynamic.filter(it => !forumItems.includes(it));
+
+				if (forumItems.length) {
+					const contentGroup = groups.find(g => g && g.title === '内容管理');
+					if (contentGroup && Array.isArray(contentGroup.items)) {
+						contentGroup.items.push(...forumItems);
+					} else {
+						moreItems.push(...forumItems);
+					}
+				}
+
+				moreItems.push(...otherItems);
+			}
+
+			groups.push({
+				title: '更多服务',
+				items: moreItems,
+				contact: this.routineContact == 1
+			});
+
+			if (this.storeMenu && this.storeMenu.length) {
+				groups.push({
+					title: '商家管理',
+					items: this.storeMenu
+						.filter(it => it && it.url && it.url !== '#' && it.url !== '/pages/service/index')
+						.map(it => ({
+							name: it.name,
+							icon: 'icon-ic_ShoppingCart1',
+							url: it.url
+						}))
+				});
+			}
+			return groups;
 		},
 		/**
 		 *
@@ -690,6 +679,14 @@ export default {
 
 		// goMenuPage
 		goMenuPage(url, name) {
+			if (typeof url === 'string') {
+				url = url.trim();
+				if (url.indexOf('pages/') === 0) url = '/' + url;
+			}
+			if (typeof url === 'string' && /^\/?pages\/forum\//.test(url)) {
+				url = '/pages/parents_classroom/index';
+				if (!name) name = '家长课堂';
+			}
 			if (this.isLogin) {
 				if (url.indexOf('http') === -1) {
 					// #ifdef H5 || APP-PLUS
@@ -722,7 +719,10 @@ export default {
 						url: url,
 						fail(err) {
 							uni.switchTab({
-								url: url
+								url: url,
+								fail() {
+									uni.showToast({ title: '页面暂不可用', icon: 'none' });
+								}
 							});
 						}
 					});
@@ -771,6 +771,582 @@ body {
 
 .height {
 	margin-top: -100rpx !important;
+}
+
+.ucHeader {
+	background: #fff;
+	padding: 40rpx 30rpx 26rpx;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	position: relative;
+}
+
+.ucHeaderLeft {
+	display: flex;
+	align-items: center;
+	gap: 20rpx;
+}
+
+.ucAvatar {
+	width: 120rpx;
+	height: 120rpx;
+	border-radius: 999rpx;
+	border: 4rpx solid rgba(241, 165, 92, 0.18);
+	padding: 4rpx;
+	background: rgba(241, 165, 92, 0.08);
+	overflow: hidden;
+}
+
+.ucAvatarImg {
+	width: 100%;
+	height: 100%;
+	border-radius: 999rpx;
+}
+
+.ucHeaderInfo {
+	display: flex;
+	flex-direction: column;
+	gap: 6rpx;
+}
+
+.ucNameRow {
+	display: flex;
+	align-items: center;
+	gap: 12rpx;
+}
+
+.ucName {
+	font-size: 36rpx;
+	font-weight: 700;
+	color: rgba(31, 35, 41, 0.95);
+}
+
+.ucLevelTag {
+	font-size: 18rpx;
+	padding: 4rpx 12rpx;
+	border-radius: 999rpx;
+	background: rgba(241, 165, 92, 0.18);
+	color: var(--view-theme);
+}
+
+.ucPhone {
+	font-size: 24rpx;
+	color: rgba(31, 35, 41, 0.45);
+}
+
+.ucHeaderRight {
+	display: flex;
+	gap: 18rpx;
+}
+
+.ucIconBtn {
+	width: 72rpx;
+	height: 72rpx;
+	border-radius: 999rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(31, 35, 41, 0.55);
+	position: relative;
+}
+
+.ucDot {
+	position: absolute;
+	top: 16rpx;
+	right: 18rpx;
+	width: 14rpx;
+	height: 14rpx;
+	border-radius: 999rpx;
+	background: #ff4d4f;
+	border: 2rpx solid #fff;
+}
+
+.ucPowerWrap {
+	padding: 0 20rpx;
+	margin-top: -12rpx;
+}
+
+.ucPowerCard {
+	position: relative;
+	overflow: hidden;
+	border-radius: 36rpx;
+	padding: 32rpx 30rpx;
+	background: linear-gradient(135deg, rgba(241, 165, 92, 1) 0%, rgba(241, 138, 72, 1) 55%, rgba(238, 92, 77, 1) 100%);
+	box-shadow: 0rpx 18rpx 46rpx rgba(241, 165, 92, 0.28);
+}
+
+.ucPowerGlow {
+	position: absolute;
+	top: -40rpx;
+	right: -60rpx;
+	width: 320rpx;
+	height: 320rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.16);
+	filter: blur(24rpx);
+}
+
+.ucPowerTop {
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 26rpx;
+}
+
+.ucPowerTitle {
+	font-size: 26rpx;
+	color: rgba(255, 255, 255, 0.92);
+	font-weight: 600;
+}
+
+.ucPowerBadge {
+	padding: 6rpx 14rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.22);
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 18rpx;
+}
+
+.ucPowerBottom {
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 20rpx;
+}
+
+.ucPowerAmount {
+	display: flex;
+	flex-direction: column;
+}
+
+.ucPowerRow {
+	display: flex;
+	align-items: baseline;
+}
+
+.ucPowerNum {
+	font-size: 88rpx;
+	line-height: 88rpx;
+	font-weight: 900;
+	color: #fff;
+}
+
+.ucPowerUnit2 {
+	margin-left: 12rpx;
+	font-size: 24rpx;
+	color: rgba(255, 255, 255, 0.8);
+}
+
+.ucPowerTip {
+	margin-top: 14rpx;
+	font-size: 20rpx;
+	color: rgba(255, 255, 255, 0.65);
+}
+
+.ucPowerBtn {
+	background: #fff;
+	color: var(--view-theme);
+	font-weight: 700;
+	padding: 18rpx 26rpx;
+	border-radius: 22rpx;
+	box-shadow: 0rpx 14rpx 26rpx rgba(0, 0, 0, 0.14);
+}
+
+.ucTabs2 {
+	margin-top: 26rpx;
+	padding: 0 20rpx;
+	display: flex;
+	align-items: center;
+	border-bottom: 2rpx solid rgba(0, 0, 0, 0.04);
+	background: #fff;
+}
+
+.ucTab2 {
+	flex: 1;
+	padding: 26rpx 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	position: relative;
+}
+
+.ucTab2Text {
+	font-size: 28rpx;
+	font-weight: 700;
+	color: rgba(31, 35, 41, 0.35);
+}
+
+.ucTab2.on .ucTab2Text {
+	color: var(--view-theme);
+}
+
+.ucTab2Line {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 64rpx;
+	height: 8rpx;
+	border-radius: 999rpx;
+	background: var(--view-theme);
+}
+
+.ucBody {
+	background: #f6f7f9;
+	padding: 20rpx 20rpx 0;
+}
+
+.ucVipBar {
+	background: #2d3139;
+	border-radius: 22rpx;
+	padding: 20rpx 20rpx;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 18rpx;
+}
+
+.ucVipLeft {
+	display: flex;
+	align-items: center;
+	gap: 14rpx;
+}
+
+.ucVipIcon {
+	width: 56rpx;
+	height: 56rpx;
+	border-radius: 999rpx;
+	background: rgba(241, 165, 92, 0.18);
+	color: rgba(241, 165, 92, 1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 30rpx;
+}
+
+.ucVipText {
+	color: rgba(255, 255, 255, 0.88);
+	font-size: 26rpx;
+}
+
+.ucVipGo {
+	color: rgba(255, 255, 255, 0.7);
+	font-size: 22rpx;
+	display: flex;
+	align-items: center;
+	gap: 6rpx;
+}
+
+.ucGroup {
+	margin-top: 18rpx;
+}
+
+.ucGroupTitle {
+	padding: 0 14rpx 10rpx;
+	font-size: 20rpx;
+	font-weight: 700;
+	color: rgba(31, 35, 41, 0.35);
+	letter-spacing: 2rpx;
+}
+
+.ucGroupCard {
+	background: #fff;
+	border-radius: 22rpx;
+	overflow: hidden;
+	border: 2rpx solid rgba(0, 0, 0, 0.03);
+}
+
+.ucItem {
+	padding: 26rpx 22rpx;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 2rpx solid rgba(0, 0, 0, 0.04);
+}
+
+.ucItem.last {
+	border-bottom: 0;
+}
+
+.ucBtnItem {
+	width: 100%;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+}
+
+.ucItemLeft {
+	display: flex;
+	align-items: center;
+	gap: 18rpx;
+}
+
+.ucItemIcon {
+	width: 44rpx;
+	height: 44rpx;
+	border-radius: 14rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 28rpx;
+}
+
+.ucItemName {
+	font-size: 28rpx;
+	color: rgba(31, 35, 41, 0.82);
+	font-weight: 500;
+}
+
+.ucItemRight {
+	display: flex;
+	align-items: center;
+	gap: 10rpx;
+}
+
+.ucItemExtra {
+	font-size: 22rpx;
+	color: rgba(31, 35, 41, 0.5);
+}
+
+.ucItemArrow {
+	font-size: 26rpx;
+	color: rgba(31, 35, 41, 0.25);
+}
+
+.aiPowerBar {
+	margin-top: 18rpx;
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 20rpx 22rpx;
+	border-radius: 16rpx;
+	background: rgba(245, 246, 248, 0.92);
+}
+
+.aiPowerLeft {
+	display: flex;
+	flex-direction: column;
+	gap: 8rpx;
+}
+
+.aiPowerLabel {
+	font-size: 26rpx;
+	color: rgba(0, 0, 0, 0.9);
+	font-weight: 600;
+}
+
+.aiPowerValue {
+	font-size: 44rpx;
+	color: rgba(0, 0, 0, 0.92);
+	font-weight: 600;
+}
+
+.aiPowerUnit {
+	margin-left: 6rpx;
+	font-size: 26rpx;
+	color: rgba(0, 0, 0, 0.72);
+}
+
+.aiPowerQuota {
+	font-size: 22rpx;
+	color: rgba(0, 0, 0, 0.72);
+	line-height: 32rpx;
+	max-width: 420rpx;
+}
+
+.aiPowerBtn {
+	height: 72rpx;
+	padding: 0 26rpx;
+	border-radius: 999rpx;
+	background: var(--view-theme);
+	color: rgba(0, 0, 0, 0.88);
+	font-size: 28rpx;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.ucTabs {
+	margin-top: 18rpx;
+	display: flex;
+	background: #fff;
+	border-radius: 16rpx;
+	overflow: hidden;
+}
+
+.ucTab {
+	flex: 1;
+	height: 88rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+
+.ucTabText {
+	font-size: 28rpx;
+	color: rgba(31, 35, 41, 0.7);
+}
+
+.ucTab.on .ucTabText {
+	color: rgba(31, 35, 41, 0.95);
+	font-weight: 600;
+}
+
+.ucTab.on::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	bottom: 10rpx;
+	transform: translateX(-50%);
+	width: 64rpx;
+	height: 6rpx;
+	border-radius: 999rpx;
+	background: var(--view-theme);
+}
+
+.ucSection {
+	margin-top: 20rpx;
+}
+
+.vipSection {
+	margin-top: 20rpx;
+}
+
+.ucQuick {
+	background: #fff;
+	border-radius: 16rpx;
+	padding: 10rpx 0;
+	display: flex;
+}
+
+.ucQuickItem {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 18rpx 0;
+}
+
+.ucQuickIcon {
+	width: 84rpx;
+	height: 84rpx;
+	border-radius: 999rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(241, 165, 92, 0.12);
+	color: var(--view-theme);
+	font-size: 44rpx;
+}
+
+.ucQuickText {
+	margin-top: 12rpx;
+	font-size: 24rpx;
+	color: rgba(31, 35, 41, 0.86);
+}
+
+.ucCard {
+	background: #fff;
+	border-radius: 16rpx;
+	padding: 26rpx 24rpx;
+}
+
+.ucCardTitle {
+	font-size: 30rpx;
+	color: rgba(31, 35, 41, 0.95);
+	font-weight: 600;
+}
+
+.ucCardDesc {
+	margin-top: 10rpx;
+	font-size: 24rpx;
+	color: rgba(31, 35, 41, 0.6);
+}
+
+.ucCardBtn {
+	margin-top: 18rpx;
+	height: 72rpx;
+	border-radius: 14rpx;
+	background: var(--view-theme);
+	color: #fff;
+	font-size: 26rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.manageGroup {
+	background: #fff;
+	border-radius: 16rpx;
+	padding: 22rpx 22rpx 10rpx;
+	margin-bottom: 20rpx;
+}
+
+.manageTitle {
+	font-size: 28rpx;
+	color: rgba(31, 35, 41, 0.95);
+	font-weight: 600;
+	margin-bottom: 12rpx;
+}
+
+.manageList {
+	display: flex;
+	flex-direction: column;
+}
+
+.manageItem {
+	height: 92rpx;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-top: 1rpx solid rgba(0, 0, 0, 0.05);
+	background: transparent;
+	padding: 0;
+}
+
+.manageItem:first-child {
+	border-top: 0;
+}
+
+.manageLeft {
+	display: flex;
+	align-items: center;
+	gap: 16rpx;
+}
+
+.manageIcon {
+	width: 56rpx;
+	height: 56rpx;
+	border-radius: 14rpx;
+	background: rgba(241, 165, 92, 0.12);
+	color: var(--view-theme);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 34rpx;
+}
+
+.manageImg {
+	width: 56rpx;
+	height: 56rpx;
+	border-radius: 14rpx;
+}
+
+.manageName {
+	font-size: 26rpx;
+	color: rgba(31, 35, 41, 0.9);
+}
+
+.manageArrow {
+	font-size: 28rpx;
+	color: rgba(31, 35, 41, 0.35);
 }
 
 .unBg {

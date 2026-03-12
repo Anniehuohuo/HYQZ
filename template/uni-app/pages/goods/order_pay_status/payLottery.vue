@@ -196,6 +196,11 @@
 				// #endif
 			},
 			getLotteryData(type) {
+				if (!type) {
+					this.$emit('lotteryShow', false)
+					this.lotteryShow = false
+					return
+				}
 				getLotteryData(type).then(res => {
 					this.factor_num = res.data.lottery.factor_num
 					this.id = res.data.lottery.id

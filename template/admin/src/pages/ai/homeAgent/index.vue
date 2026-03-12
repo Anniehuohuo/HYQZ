@@ -8,6 +8,10 @@
         <el-form-item label="AI开关">
           <el-switch v-model="form.enabled" active-text="启用" inactive-text="停用"></el-switch>
         </el-form-item>
+        <el-form-item label="每日免费对话次数">
+          <el-input-number v-model="form.freeDailyLimit" :min="0" :max="999999" :step="1" :precision="0"></el-input-number>
+          <div style="color: #999; margin-top: 6px">设置为 0 表示不限制</div>
+        </el-form-item>
         <el-form-item label="接口地址">
           <el-input v-model="form.chatUrl" placeholder="例如：https://open.bigmodel.cn/api/paas/v4/chat/completions"></el-input>
         </el-form-item>
@@ -63,6 +67,7 @@ export default {
     return {
       form: {
         enabled: false,
+        freeDailyLimit: 0,
         chatUrl: '',
         apiKey: '',
         hasApiKey: false,
@@ -87,6 +92,7 @@ export default {
         .then((res) => {
           const d = res.data || {};
           this.form.enabled = !!d.enabled;
+          this.form.freeDailyLimit = Number(d.freeDailyLimit || 0) || 0;
           this.form.chatUrl = d.chatUrl || '';
           this.form.hasApiKey = !!d.hasApiKey;
           this.form.apiKey = '';
@@ -105,6 +111,7 @@ export default {
     save() {
       const payload = {
         enabled: this.form.enabled ? 1 : 0,
+        freeDailyLimit: Number(this.form.freeDailyLimit || 0) || 0,
         chatUrl: this.form.chatUrl,
         name: this.form.name,
         status: this.form.status ? 1 : 0,

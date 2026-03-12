@@ -388,6 +388,11 @@
             <div>{{ scope.row.now_money }}</div>
           </template>
         </el-table-column>
+        <el-table-column label="算力" prop="ai_power_balance" min-width="90">
+          <template slot-scope="scope">
+            <div>{{ scope.row.ai_power_balance || 0 }}</div>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" fixed="right" width="120">
           <template slot-scope="scope">
             <template v-if="scope.row.is_del != 1">
@@ -398,14 +403,17 @@
                 <span class="el-dropdown-link">更多<i class="el-icon-arrow-down el-icon--right"></i> </span>
                 <el-dropdown-menu slot="dropdown">
                   <!-- <el-dropdown-item command="1">编辑</el-dropdown-item> -->
-                  <el-dropdown-item command="2">修改余额</el-dropdown-item>
-                  <el-dropdown-item command="8">修改积分</el-dropdown-item>
-                  <el-dropdown-item command="3">赠送会员</el-dropdown-item>
+                  <el-dropdown-item command="2" v-if="!isDivisionAccount">修改余额</el-dropdown-item>
+                  <el-dropdown-item command="8" v-if="!isDivisionAccount">修改积分</el-dropdown-item>
+                  <el-dropdown-item command="10">赠送算力</el-dropdown-item>
+                  <el-dropdown-item command="3" v-if="!isDivisionAccount">赠送会员</el-dropdown-item>
                   <!--                                <el-dropdown-item command="4" v-if="row.vip_name">清除等级</el-dropdown-item>-->
-                  <el-dropdown-item command="5">设置分组</el-dropdown-item>
-                  <el-dropdown-item command="6">设置标签</el-dropdown-item>
+                  <el-dropdown-item command="5" v-if="!isDivisionAccount">设置分组</el-dropdown-item>
+                  <el-dropdown-item command="6" v-if="!isDivisionAccount">设置标签</el-dropdown-item>
                   <el-dropdown-item command="7">修改上级推广人</el-dropdown-item>
-                  <el-dropdown-item command="99" v-if="scope.row.spread_uid">清除上级推广人</el-dropdown-item>
+                  <el-dropdown-item command="99" v-if="!isDivisionAccount && scope.row.spread_uid">
+                    清除上级推广人
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </el-dropdown>
             </template>
@@ -523,6 +531,7 @@ import {
   getUserData,
   isShowApi,
   editOtherApi,
+  giveAiPowerApi,
   giveLevelApi,
   userSetGroup,
   userGroupApi,
@@ -579,9 +588,7 @@ export default {
       },
       pickerOptions: this.$timeOptions,
       collapse: false,
-      headeNum: [
-        { type: '', name: '全部' },
-      ],
+      headeNum: [{ type: '', name: '全部' }],
       address: [],
       addresData: [],
       isShowSend: true,
@@ -660,6 +667,11 @@ export default {
   },
   computed: {
     ...mapState('media', ['isMobile']),
+    ...mapState('userInfo', ['userInfo', 'access']),
+    isDivisionAccount() {
+      const info = this.userInfo || {};
+      return Number(info.division_id) > 0;
+    },
   },
   created() {
     this.getList();
@@ -944,6 +956,9 @@ export default {
           break;
         case '8':
           this.getOtherFrom(row.uid, 'point');
+          break;
+        case '10':
+          this.$modalForm(giveAiPowerApi(row.uid)).then(() => this.getList(1));
           break;
         default:
           this.del(row, '解除【 ' + this.tenText(row.nickname) + ' 】的上级推广人', index, 'tuiguang');

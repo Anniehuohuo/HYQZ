@@ -103,6 +103,13 @@ export function editOtherApi(id, type) {
   });
 }
 
+export function giveAiPowerApi(uid) {
+  return request({
+    url: `ai/power_user/give_form/${uid}`,
+    method: 'get',
+  });
+}
+
 /**
  * @description 会员管理-详情
  * @param {Number} param id {Number} 用户id

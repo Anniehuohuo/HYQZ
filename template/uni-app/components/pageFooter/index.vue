@@ -133,6 +133,21 @@ export default {
 		};
 	},
 	methods: {
+		normalizeLink(link) {
+			if (typeof link !== 'string') return '';
+			let u = link.trim();
+			if (u.indexOf('pages/') === 0) u = '/' + u;
+			if (u.indexOf('/pages/forum/') === 0) u = '/pages/parents_classroom/index';
+			return u;
+		},
+		isTabLink(link) {
+			return (
+				link === '/pages/index/index' ||
+				link === '/pages/goods_cate/goods_cate' ||
+				link === '/pages/order_addcart/order_addcart' ||
+				link === '/pages/user/index'
+			);
+		},
 		setNavigationInfo(data) {
 			if (this.isTabBar) {
 				this.newData = data;
@@ -171,20 +186,34 @@ export default {
 		goRouter(item) {
 			var pages = getCurrentPages();
 			var page = pages[pages.length - 1].$page.fullPath;
-			if (item.link == page) return;
-			if (item.link == '/pages/short_video/appSwiper/index' || item.link == '/pages/short_video/nvueSwiper/index') {
+			let link = this.normalizeLink(item && item.link ? item.link : '');
+			if (!link) return;
+			if (link == page) return;
+			if (link == '/pages/short_video/appSwiper/index' || link == '/pages/short_video/nvueSwiper/index') {
 				//#ifdef APP
-				item.link = '/pages/short_video/appSwiper/index';
+				link = '/pages/short_video/appSwiper/index';
 				//#endif
 				//#ifndef APP
-				item.link = '/pages/short_video/nvueSwiper/index';
+				link = '/pages/short_video/nvueSwiper/index';
 				//#endif
 			}
-			uni.switchTab({
-				url: item.link,
-				fail(err) {
+			if (this.isTabLink(link)) {
+				uni.switchTab({
+					url: link,
+					fail() {
+						uni.showToast({ title: '页面暂不可用', icon: 'none' });
+					}
+				});
+				return;
+			}
+			uni.navigateTo({
+				url: link,
+				fail() {
 					uni.redirectTo({
-						url: item.link
+						url: link,
+						fail() {
+							uni.showToast({ title: '页面暂不可用', icon: 'none' });
+						}
 					});
 				}
 			});

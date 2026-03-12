@@ -239,6 +239,31 @@ class StoreOrderCreateServices extends BaseServices
         if (!$storeSelfMention) $shippingType = 1;
         if ($is_gift == 1) $shippingType = 0;
 
+        try {
+            if ((int)sys_config('division_status', 1) && empty($userInfo['agent_id']) && empty($userInfo['staff_id']) && empty($userInfo['division_id'])) {
+                $spreadUid = (int)($userInfo['spread_uid'] ?? 0);
+                if ($spreadUid > 0) {
+                    /** @var UserServices $userServices */
+                    $userServices = app()->make(UserServices::class);
+                    $spreadUser = $userServices->getUserInfo($spreadUid, 'uid,is_agent,is_division,division_id,division_status,division_end_time');
+                    if ($spreadUser) {
+                        if ((int)($spreadUser['is_agent'] ?? 0) === 1) {
+                            $bindDivisionId = (int)($spreadUser['division_id'] ?? 0);
+                            if ($bindDivisionId > 0) {
+                                $userServices->update($uid, ['agent_id' => $spreadUid, 'division_id' => $bindDivisionId]);
+                                $userInfo['agent_id'] = $spreadUid;
+                                $userInfo['division_id'] = $bindDivisionId;
+                            }
+                        } elseif ((int)($spreadUser['is_division'] ?? 0) === 1) {
+                            $userServices->update($uid, ['division_id' => $spreadUid]);
+                            $userInfo['division_id'] = $spreadUid;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
         $orderInfo = [
             'uid' => $uid,
             'order_id' => $this->getNewOrderId('cp'),

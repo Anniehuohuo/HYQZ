@@ -621,9 +621,13 @@ class StoreProductServices extends BaseServices
         } elseif ($data['freight'] == 3) {
             $data['postage'] = 0;
         }
+        $autoHot = !$id && empty($data['recommend']);
         $data['is_hot'] = $data['is_benefit'] = $data['is_new'] = $data['is_good'] = $data['is_best'] = 0;
         foreach ($data['recommend'] as $item) {
             $data[$item] = 1;
+        }
+        if ($autoHot) {
+            $data['is_hot'] = 1;
         }
         foreach ($detail as &$item) {
             if ($data['is_sub'] == 0) {

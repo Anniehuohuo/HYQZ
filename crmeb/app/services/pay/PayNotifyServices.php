@@ -14,6 +14,7 @@ namespace app\services\pay;
 use app\services\order\OtherOrderServices;
 use app\services\order\StoreOrderSuccessServices;
 use app\services\user\UserRechargeServices;
+use app\services\ai\AiPowerRechargeServices;
 
 /**
  * 支付成功回调 所有的异步通知回调都会走下面的三个方法,不在取分微信/支付宝支付回调
@@ -57,6 +58,17 @@ class PayNotifyServices
             $userRecharge = app()->make(UserRechargeServices::class);
             if ($userRecharge->be(['order_id' => $order_id, 'paid' => 1])) return true;
             return $userRecharge->rechargeSuccess($order_id, ['trade_no' => $trade_no, 'pay_type' => $payType]);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function wechatAiPowerRecharge(string $order_id = null, string $trade_no = null, string $payType = PayServices::WEIXIN_PAY)
+    {
+        try {
+            $services = app()->make(AiPowerRechargeServices::class);
+            if ($services->be(['order_id' => $order_id, 'paid' => 1])) return true;
+            return $services->rechargeSuccess($order_id, ['trade_no' => $trade_no, 'pay_type' => $payType]);
         } catch (\Exception $e) {
             return false;
         }

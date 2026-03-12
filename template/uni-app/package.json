@@ -1,6 +1,17 @@
 {
   "name": "uni-app",
   "version": "1.0.0",
+  "scripts": {
+    "test:responsive:agents": "node scripts/responsive_agents_test.js",
+    "test:qingyan:align": "node scripts/qingyan_alignment_eval.js",
+    "test:markdown:render": "node scripts/markdown_render_test.js",
+    "bench:markdown:render": "node scripts/markdown_render_bench.js",
+    "diff:qingyan:scene": "node scripts/qingyan_scene_practice_diff.js",
+    "test:chat:contract": "node scripts/ai_chat_contract_test.js",
+    "test:qingyan:length": "node scripts/qingyan_length_smoke.js",
+    "test:chat:clear": "node scripts/chat_clear_test.js",
+    "test:blocks:render": "node scripts/blocks_render_test.js"
+  },
   "dependencies": {
   }
 }

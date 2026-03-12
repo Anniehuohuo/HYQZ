@@ -69,16 +69,6 @@
 					<text class='iconfont icon-dingdan'></text>
 					<view>{{userInfo.is_division?$t(`事业部`):$t(`代理商`)}}{{$t(`推广订单`)}}</view>
 				</navigator>
-				<navigator url='/pages/users/promoter_rank/index' hover-class="none"
-					class='item acea-row row-center-wrapper row-column'>
-					<text class='iconfont icon-paihang1'></text>
-					<view>{{$t(`推广人排行`)}}</view>
-				</navigator>
-				<navigator url='/pages/users/commission_rank/index' hover-class="none"
-					class='item acea-row row-center-wrapper row-column'>
-					<text class='iconfont icon-paihang'></text>
-					<view>{{$t(`佣金排行`)}}</view>
-				</navigator>
 				<navigator v-if="userInfo.division_open && userInfo.is_agent" url='/pages/users/staff_list/index' hover-class="none"
 					class='item acea-row row-center-wrapper row-column'>
 					<text class='iconfont icon-tuandui'></text>
@@ -205,14 +195,6 @@
 				let that = this;
 				getUserInfo().then(res => {
 					that.$set(that, 'userInfo', res.data);
-					if (!res.data.spread_status) {
-						that.$util.Tips({
-							title: that.$t(`您目前暂无推广权限`)
-						}, {
-							tab: 1,
-							url: '/pages/index/index'
-						});
-					}
 				});
 			}
 		}

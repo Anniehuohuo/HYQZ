@@ -2,6 +2,13 @@
   <div>
     <el-card :bordered="false" shadow="never" class="ivu-mb-16" :body-style="{ padding: 0 }">
       <div class="padding-add">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+          <div style="font-weight: 600">小程序论坛开关</div>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <el-switch v-model="forumEnabled" :active-value="1" :inactive-value="0" :disabled="forumSaving" @change="onForumToggle" />
+            <div style="color: rgba(0,0,0,0.55); font-size: 12px">关闭后小程序端显示“该功能暂未开放”</div>
+          </div>
+        </div>
         <el-form
           ref="formValidate"
           :model="formValidate"
@@ -106,13 +113,15 @@
 
 <script>
 import { mapState } from 'vuex';
-import { forumPostListApi } from '@/api/forum';
+import { forumConfigGetApi, forumConfigSaveApi, forumPostListApi } from '@/api/forum';
 import { formatDate } from '@/utils/validate';
 export default {
   name: 'forum_post',
   data() {
     return {
       loading: false,
+      forumEnabled: 0,
+      forumSaving: false,
       formValidate: {
         page: 1,
         limit: 20,
@@ -144,9 +153,33 @@ export default {
     },
   },
   created() {
+    this.loadForumConfig();
     this.getList();
   },
   methods: {
+    loadForumConfig() {
+      forumConfigGetApi()
+        .then((res) => {
+          const d = (res && res.data) || {};
+          this.forumEnabled = Number(d.enabled || 0) ? 1 : 0;
+        })
+        .catch(() => {});
+    },
+    onForumToggle(val) {
+      if (this.forumSaving) return;
+      this.forumSaving = true;
+      forumConfigSaveApi({ enabled: Number(val || 0) ? 1 : 0 })
+        .then(() => {
+          this.$message.success('保存成功');
+        })
+        .catch((err) => {
+          this.$message.error((err && err.msg) || '保存失败');
+          this.forumEnabled = this.forumEnabled ? 0 : 1;
+        })
+        .finally(() => {
+          this.forumSaving = false;
+        });
+    },
     getList() {
       this.loading = true;
       forumPostListApi(this.formValidate)

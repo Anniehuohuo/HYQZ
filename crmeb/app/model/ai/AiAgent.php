@@ -4,6 +4,7 @@ namespace app\model\ai;
 
 use crmeb\basic\BaseModel;
 use crmeb\traits\ModelTrait;
+use think\facade\Db;
 
 class AiAgent extends BaseModel
 {
@@ -31,7 +32,27 @@ class AiAgent extends BaseModel
                 ->whereOrLike('description', '%' . $value . '%')
                 ->whereOrLike('tags', '%' . $value . '%')
                 ->whereOrLike('bot_id', '%' . $value . '%');
+            if ($this->hasProviderAssistantIdColumn()) {
+                $q->whereOrLike('provider_assistant_id', '%' . $value . '%');
+            }
         });
+    }
+
+    protected function hasProviderAssistantIdColumn(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return (bool)$cached;
+        }
+        try {
+            $prefix = (string)config('database.connections.mysql.prefix', '');
+            $table = $prefix . 'ai_agents';
+            $rows = Db::query("SHOW COLUMNS FROM `{$table}` LIKE 'provider_assistant_id'");
+            $cached = is_array($rows) && count($rows) > 0;
+        } catch (\Throwable $e) {
+            $cached = false;
+        }
+        return (bool)$cached;
     }
 
     public function searchCategoryIdAttr($query, $value)

@@ -2,14 +2,6 @@
 	<!-- 首页 -->
 	<view v-if="pageShow" class="page" :class="bgTabVal == 2 ? 'fullsize noRepeat' : bgTabVal == 1 ? 'repeat ysize' : 'noRepeat ysize'" :style="[pageStyle]">
 		<view v-if="!errorNetwork" :style="colorStyle">
-			<!-- #ifdef MP -->
-			<view class="fixed z-1000" :style="[appletStyle]" v-if="myApplet">
-				<view class="myApplet w-324 h-62 text-center rd-12rpx lh-62rpx fs-24 bg--w111-fff text-w111-303133">
-					点击添加到我的小程序
-					<text class="iconfont icon-ic_close2 text--w111-ccc ml-16" @click="myApplet = false"></text>
-				</view>
-			</view>
-			<!-- #endif -->
 			<!-- 轮播搜索 -->
 			<homeComb v-if="showHomeComb" :dataConfig="homeCombData" :belongIndex="belongIndex" @bindSortId="bindSortId" :isScrolled="isScrolled" @storeTap="storeTap"></homeComb>
 			<!-- 顶部搜索框 -->
@@ -318,7 +310,7 @@ export default {
 			belongIndex: 0, // 进店规则归属门店排序位置；
 			isBelongStore: false, //判断是否为归属门店；
 			getHeight: this.$util.getWXStatusHeight(),
-			myApplet: true,
+			myApplet: false,
 			configData: Cache.get('BASIC_CONFIG')
 		};
 	},
@@ -397,13 +389,6 @@ export default {
 			this.getCoupon();
 			this.getCartNum();
 		}
-		// #ifdef MP
-		if (wx.canIUse('checkIsAddedToMyMiniProgram')) {
-			this.checkMyApplet();
-		} else {
-			this.myApplet = true;
-		}
-		// #endif
 	},
 	onPullDownRefresh() {
 		this.diyData();
@@ -411,20 +396,6 @@ export default {
 	},
 	methods: {
 		...mapMutations(['SET_AUTOPLAY', 'SET_NEARBY']),
-		checkMyApplet() {
-			wx.checkIsAddedToMyMiniProgram({
-				success: (res) => {
-					if (res.added) {
-						this.myApplet = false;
-					} else {
-						this.myApplet = true;
-					}
-				},
-				fail: () => {
-					this.myApplet = true;
-				}
-			});
-		},
 		getCartNum: function () {
 			getCartCounts()
 				.then((res) => {

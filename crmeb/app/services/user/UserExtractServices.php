@@ -228,17 +228,8 @@ class UserExtractServices extends BaseServices
                         bcmul($extractNumber, '100', 0),
                         '佣金提现到零钱',
                         sys_config('site_url') . '/api/transfer/notify/' . $type,
-                        '劳务报酬',
-                        [
-                            [
-                                'info_type' => '岗位类型',
-                                'info_content' => '推广员奖励'
-                            ],
-                            [
-                                'info_type' => '报酬说明',
-                                'info_content' => '推广订单奖励提现'
-                            ],
-                        ]
+                        '',
+                        []
                     );
                     $this->dao->update($id, [
                         'out_bill_no' => $res['out_bill_no'] ?? '',

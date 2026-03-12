@@ -90,6 +90,11 @@ class AdminAuthServices extends BaseServices
             throw new AuthException($code);
         }
 
+        if ((int)$adminInfo->getData('division_id') > 0 && (int)$adminInfo->getData('level') === 0) {
+            $adminInfo->level = 1;
+            $adminInfo->save();
+        }
+
         $adminInfo->type = $type;
         return $adminInfo->hidden(['pwd', 'is_del', 'status'])->toArray();
     }

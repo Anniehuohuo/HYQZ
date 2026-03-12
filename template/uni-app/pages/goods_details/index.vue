@@ -638,6 +638,8 @@ export default {
 			svip_price_open: 1,
 			is_gift: 0, // 是否支持送礼
 			isGiftOrder: 0,
+			agent_id: 0,
+			agent_title: '',
 			realPriceData: {
 				is_vip: 0,
 				price: 0,
@@ -667,6 +669,8 @@ export default {
 	},
 	onLoad(options) {
 		let that = this;
+		that.agent_id = options.agent_id ? Number(options.agent_id) || 0 : 0;
+		that.agent_title = options.agent_title ? decodeURIComponent(options.agent_title) : '';
 		var pages = getCurrentPages();
 		that.returnShow = pages.length === 1 ? false : true;
 		// #ifdef MP
@@ -1479,6 +1483,7 @@ export default {
 					if (news) {
 						let url = '/pages/goods/order_confirm/index?new=1&cartId=' + res.data.cartId;
 						if (this.isGiftOrder) url += '&is_gift=' + this.isGiftOrder;
+						if (this.agent_id) url += '&agent_id=' + this.agent_id + '&agent_title=' + encodeURIComponent(this.agent_title || '');
 						uni.navigateTo({
 							url
 						});

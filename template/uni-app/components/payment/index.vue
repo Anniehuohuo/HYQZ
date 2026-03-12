@@ -81,6 +81,7 @@
 							newPayList.push(item)
 						}
 					});
+					if (!newPayList.length) return;
 					this.active = newPayList[0].index;
 					this.paytype = newPayList[0].value;
 					this.number = newPayList[0].number || 0;

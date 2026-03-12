@@ -153,8 +153,9 @@
 		watch: {
 			distributionLevel: function() {
 				let that = this;
-				if (that.distributionLevel.length > 0) {
-					that.distributionLevel.forEach(function(item, index) {
+				const list = Array.isArray(that.distributionLevel) ? that.distributionLevel : [];
+				if (list.length > 0) {
+					list.forEach(function(item, index) {
 						if (item.is_clear === false) {
 							// that.swiper.slideTo(index);
 							that.activeIndex = index;
@@ -187,33 +188,40 @@
 		},
 		methods: {
 			agentLevelList: function() {
-				agentLevelList().then(res => {
-					const {
-						level_info,
-						level_list,
-						task,
-						user
-					} = res.data;
-					this.levelInfo = level_info;
-					this.distributionLevel = level_list;
-					this.userInfo = user;
-					this.taskInfo = task;
-					this.levelInfo.exp = parseFloat(this.levelInfo.exp);
-					this.levelInfo.rate = Math.floor(this.levelInfo.exp / this.levelInfo.exp_num * 100);
-					if (this.levelInfo.rate > 100) {
-						this.levelInfo.rate = 100;
-					}
-					const index = level_list.findIndex((
-							grade, v
-						) =>
-						grade.id === user.agent_level
-					);
-					if (index !== -1) {
-						this.swiperIndex = index === -1 ? 0 : index;
-					}
-					this.level_id = this.distributionLevel[index === -1 ? 0 : index].id || 0;
-					this.getTask();
-				});
+				agentLevelList()
+					.then(res => {
+						const data = res && res.data ? res.data : {};
+						const levelInfo = data.level_info || {};
+						const levelList = Array.isArray(data.level_list) ? data.level_list : [];
+						const task = data.task || {};
+						const user = data.user || {};
+
+						this.levelInfo = levelInfo;
+						this.distributionLevel = levelList;
+						this.userInfo = user;
+						this.taskInfo = task;
+
+						const exp = parseFloat(this.levelInfo.exp || 0);
+						const expNum = parseFloat(this.levelInfo.exp_num || 0);
+						this.levelInfo.exp = exp;
+						this.levelInfo.rate = expNum > 0 ? Math.floor((exp / expNum) * 100) : 0;
+						if (this.levelInfo.rate > 100) this.levelInfo.rate = 100;
+
+						const index = levelList.findIndex(item => item && item.id === user.agent_level);
+						this.swiperIndex = index !== -1 ? index : 0;
+
+						const current = levelList[this.swiperIndex];
+						this.level_id = current && current.id ? current.id : 0;
+						this.getTask();
+					})
+					.catch(() => {
+						this.levelInfo = {};
+						this.distributionLevel = [];
+						this.userInfo = {};
+						this.taskInfo = {};
+						this.task = [];
+						this.taskNum = 0;
+					});
 			},
 			/**
 			 * 获取我的推荐
@@ -236,6 +244,7 @@
 			 */
 			swiperChange(e) {
 				let index = e.detail.current;
+				if (!Array.isArray(this.distributionLevel) || !this.distributionLevel[index]) return;
 				this.swiperIndex = index;
 				this.level_id = this.distributionLevel[index].id || 0;
 				this.level_title = this.distributionLevel[index].name || '';
@@ -263,12 +272,15 @@
 				let that = this;
 				that.taskNum = 0
 				agentLevelTaskList(that.level_id).then(res => {
-					that.task = res.data
+					that.task = Array.isArray(res.data) ? res.data : []
 					for (let i = 0; i < that.task.length; i++) {
-						if (that.task[i].finish) {
+						if (that.task[i] && that.task[i].finish) {
 							that.taskNum += 1
 						}
 					}
+				}).catch(() => {
+					that.task = []
+					that.taskNum = 0
 				});
 			}
 		},
@@ -396,7 +408,7 @@
 					width: 8rpx;
 					height: 40rpx;
 					border-radius: 4rpx;
-					background-color: #E8B869;
+					background-color: var(--view-theme);
 				}
 			}
 
@@ -407,7 +419,7 @@
 			}
 
 			.task-num {
-				color: #C6985C;
+				color: var(--view-theme);
 			}
 		}
 
@@ -466,7 +478,7 @@
 				.fill {
 					height: 100%;
 					border-radius: 6rpx;
-					background-color: #E7B667;
+					background-color: var(--view-theme);
 				}
 			}
 
@@ -487,7 +499,7 @@
 				color: #999999;
 
 				.new-number {
-					color: #C6985C;
+					color: var(--view-theme);
 				}
 			}
 		}

@@ -12,9 +12,12 @@
 namespace app\services\system;
 
 use app\dao\system\SystemMenusDao;
+use app\model\system\SystemMenus;
 use app\services\BaseServices;
 use app\services\system\admin\SystemRoleServices;
+use app\model\system\admin\SystemRole;
 use crmeb\exceptions\AdminException;
+use crmeb\services\CacheService;
 use crmeb\services\FormBuilder as Form;
 use crmeb\utils\Arr;
 
@@ -72,6 +75,7 @@ class SystemMenusServices extends BaseServices
      */
     public function getMenusList($rouleId, int $level)
     {
+        $this->ensureDivisionMenusOpened();
         /** @var SystemRoleServices $systemRoleServices */
         $systemRoleServices = app()->make(SystemRoleServices::class);
         $rules = $systemRoleServices->getRoleArray(['status' => 1, 'id' => $rouleId], 'rules');
@@ -285,5 +289,123 @@ class SystemMenusServices extends BaseServices
             }
         }
         return $navList;
+    }
+
+    protected function ensureDivisionMenusOpened(): void
+    {
+        try {
+            /** @var SystemMenus $model */
+            $model = app()->make(SystemMenus::class);
+            $menuChanged = false;
+
+            $agentRootId = (int)$model->where('unique_auth', 'admin-agent')->value('id');
+            if (!$agentRootId) {
+                $agentRootId = (int)$model->where('pid', 0)->where('menu_path', '/agent')->value('id');
+            }
+            if (!$agentRootId) {
+                return;
+            }
+
+            $divisionPid = (int)$model->where('unique_auth', 'agent-division')->value('id');
+            if (!$divisionPid) {
+                $divisionPid = (int)$model->insertGetId([
+                    'pid' => $agentRootId,
+                    'icon' => '',
+                    'menu_name' => '事业部',
+                    'module' => 'admin',
+                    'controller' => '',
+                    'action' => '',
+                    'api_url' => '',
+                    'methods' => '',
+                    'params' => '[]',
+                    'sort' => 0,
+                    'is_show' => 1,
+                    'is_show_path' => 1,
+                    'access' => 1,
+                    'menu_path' => '/agent/division',
+                    'path' => (string)$agentRootId,
+                    'auth_type' => 1,
+                    'header' => '',
+                    'is_header' => 0,
+                    'unique_auth' => 'agent-division',
+                    'is_del' => 0,
+                    'mark' => '事业部',
+                ]);
+                $menuChanged = true;
+            } else {
+                $affected = $model->where('id', $divisionPid)->update(['is_show' => 1, 'is_show_path' => 1, 'access' => 1, 'is_del' => 0]);
+                if ($affected) $menuChanged = true;
+            }
+
+            $childPath = $agentRootId . '/' . $divisionPid;
+            $children = [
+                [
+                    'menu_name' => '事业部列表',
+                    'menu_path' => '/division/index',
+                    'unique_auth' => 'agent-division-index',
+                    'mark' => '事业部列表',
+                ],
+                [
+                    'menu_name' => '代理商列表',
+                    'menu_path' => '/division/agent/index',
+                    'unique_auth' => 'agent-division-agent-index',
+                    'mark' => '代理商列表',
+                ],
+                [
+                    'menu_name' => '事业部统计',
+                    'menu_path' => '/division/agent/statistics',
+                    'unique_auth' => 'agent-division-statistics',
+                    'mark' => '事业部统计',
+                ],
+                [
+                    'menu_name' => '代理商申请',
+                    'menu_path' => '/division/agent/applyList',
+                    'unique_auth' => 'agent-division-agent-applyList',
+                    'mark' => '代理商申请',
+                ],
+                [
+                    'menu_name' => '代理商规则',
+                    'menu_path' => '/division/agent/agreement',
+                    'unique_auth' => 'agent-division-agent-agreement',
+                    'mark' => '代理商规则',
+                ],
+            ];
+
+            foreach ($children as $child) {
+                $childId = (int)$model->where('unique_auth', $child['unique_auth'])->value('id');
+                if (!$childId) {
+                    $childId = (int)$model->insertGetId([
+                        'pid' => $divisionPid,
+                        'icon' => '',
+                        'menu_name' => $child['menu_name'],
+                        'module' => 'admin',
+                        'controller' => '',
+                        'action' => '',
+                        'api_url' => '',
+                        'methods' => '',
+                        'params' => '[]',
+                        'sort' => 0,
+                        'is_show' => 1,
+                        'is_show_path' => 1,
+                        'access' => 1,
+                        'menu_path' => $child['menu_path'],
+                        'path' => $childPath,
+                        'auth_type' => 1,
+                        'header' => '',
+                        'is_header' => 0,
+                        'unique_auth' => $child['unique_auth'],
+                        'is_del' => 0,
+                        'mark' => $child['mark'],
+                    ]);
+                    $menuChanged = true;
+                } else {
+                    $affected = $model->where('id', $childId)->update(['pid' => $divisionPid, 'is_show' => 1, 'is_show_path' => 1, 'access' => 1, 'is_del' => 0, 'path' => $childPath]);
+                    if ($affected) $menuChanged = true;
+                }
+            }
+            if ($menuChanged) CacheService::clear();
+        } catch (\Throwable $e) {
+            return;
+        }
     }
 }

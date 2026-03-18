@@ -1056,7 +1056,8 @@ export default {
 	// 计算头部自定义导航高度；
 	getWXStatusHeight() {
 		// 获取距上
-		const barTop = uni.getSystemInfoSync().statusBarHeight;
+		const windowInfo = uni.getWindowInfo();
+		const barTop = windowInfo.statusBarHeight;
 		// #ifdef MP
 		// 获取胶囊按钮位置信息
 		const menuButtonInfo = wx.getMenuButtonBoundingClientRect() || 0

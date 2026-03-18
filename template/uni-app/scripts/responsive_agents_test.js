@@ -1,7 +1,7 @@
 const assert = require('assert')
 
 /**
- * 根据屏幕宽度推导“智能体矩阵”卡片列数。
+ * 根据屏幕宽度推导“技能课超市”卡片列数。
  * 该逻辑需与 pages/ai/agents.vue 中的媒体查询保持一致：
  * - max-width: 360px  => 1 列
  * - min-width: 1024px => 3 列

@@ -133,6 +133,24 @@ export default {
 		};
 	},
 	methods: {
+		measureFooterHeight() {
+			if (!this.showTabBar) return
+			if (typeof uni === 'undefined' || typeof uni.createSelectorQuery !== 'function') return
+			try {
+				uni.createSelectorQuery()
+					.in(this)
+					.select('.fixed-lb')
+					.boundingClientRect((rect) => {
+						const h = rect && rect.height ? Number(rect.height) : 0
+						if (h > 0) {
+							this.footerHeight = h
+							const pdHeight = this.newData && this.newData.topConfig ? (Number(this.newData.topConfig.val || 0) + Number((this.newData.bottomConfig && this.newData.bottomConfig.val) || 0)) : 0
+							this.$emit('newDataStatus', true, pdHeight, h)
+						}
+					})
+					.exec()
+			} catch (e) {}
+		},
 		normalizeLink(link) {
 			if (typeof link !== 'string') return '';
 			let u = link.trim();
@@ -156,6 +174,9 @@ export default {
 				this.$emit('newDataStatus', data.effectConfig.tabVal, pdHeight);
 				if (data.effectConfig.tabVal) {
 					uni.hideTabBar();
+					this.$nextTick(() => {
+						this.measureFooterHeight()
+					})
 				} else {
 					uni.showTabBar();
 				}

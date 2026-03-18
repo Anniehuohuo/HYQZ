@@ -31,7 +31,7 @@ export default {
       alias: ['agent_matrix/'],
       name: `${pre}agentMatrix`,
       meta: {
-        title: '智能体矩阵',
+        title: '技能课超市',
         auth: ['ai-agent-matrix']
       },
       component: () => import('@/pages/ai/agentMatrix/index'),

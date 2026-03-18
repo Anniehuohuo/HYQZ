@@ -17,7 +17,7 @@ class AiPowerRechargeServices
     {
         $packages = $this->getPackages();
         $attention = trim((string)sys_config('ai_power_recharge_attention', ''));
-        $attentionArr = $attention !== '' ? explode("\n", $attention) : ['算力仅用于智能体矩阵对话', '每日前三次免费，之后按次扣费'];
+        $attentionArr = $attention !== '' ? explode("\n", $attention) : ['算力仅用于技能课超市对话', '每日前三次免费，之后按次扣费'];
         return [
             'enabled' => (int)sys_config('ai_power_enabled', 1),
             'cost_per_chat' => (int)sys_config('ai_power_cost_per_chat', 1),

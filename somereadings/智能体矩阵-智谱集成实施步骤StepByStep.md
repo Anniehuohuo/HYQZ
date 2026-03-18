@@ -1,9 +1,9 @@
-# 智能体矩阵（Agent Matrix）× 智谱应用集成实施步骤（Step by Step）
+# 技能课超市（Agent Matrix）× 智谱应用集成实施步骤（Step by Step）
 
-> 目标：在现有 HYQZ 项目中，实现「从智谱应用到小程序前端」的完整智能体矩阵能力，包括：
+> 目标：在现有 HYQZ 项目中，实现「从智谱应用到小程序前端」的完整技能课超市能力，包括：
 >
 > - 后台可视化配置多个智能体（组合数据）
-> - 前端展示智能体矩阵列表
+> - 前端展示技能课超市列表
 > - 用户选择某智能体后，发起真实对话（调用智谱 `/v3/application/invoke`）
 
 本文档面向「执行这个任务的 AI 开发助手」，要求严格按步骤实施，必要时可根据项目实际微调，但不改变整体架构思路。
@@ -48,7 +48,7 @@
    - 后端 API：`crmeb\app\api\`
    - uni-app 前端：`template\uni-app\`
    - 智能体相关前端页面：
-     - 智能体矩阵：`template\uni-app\pages\ai\agents.vue`
+     - 技能课超市：`template\uni-app\pages\ai\agents.vue`
      - 智能体聊天：`template\uni-app\pages\ai\chat.vue`
 
 ### 2.2 智谱控制台准备
@@ -112,7 +112,7 @@
    - 使用 `sys_config('zhupu_api_key')` 获取 API Key。
    - 使用 `sys_config('zhupu_base_url', 'https://open.bigmodel.cn/api/llm-application/open')` 获取基础 URL。
 
-### 3.2 组合数据：定义智能体矩阵配置结构
+### 3.2 组合数据：定义技能课超市配置结构
 
 目的：无需新建业务表，通过 CRMEB 组合数据在后台配置多个智能体。
 
@@ -128,7 +128,7 @@
 3. 新建一组组合数据：
 
    - 配置名称（config_name）：`agent_matrix`（约定值，后端将使用该名字取数据）。
-   - 标题（可见名称）：例如「智能体矩阵配置」。
+   - 标题（可见名称）：例如「技能课超市配置」。
    - 字段设计建议：
      - `key`：
        - 类型：输入框。
@@ -360,7 +360,7 @@
 
 ## 五、前端 uni-app 实现步骤
 
-### 5.1 智能体矩阵页：agents.vue
+### 5.1 技能课超市页：agents.vue
 
 文件位置：
 
@@ -470,7 +470,7 @@
        - 返回 JSON 中存在 `conversation_id`。
        - `reply` 为一段合理中文文本。
 4. 启动 uni-app 前端：
-   - 打开智能体矩阵页：
+   - 打开技能课超市页：
      - 预期：列表从接口加载，展示配置的智能体。
    - 点击某智能体进入聊天页：
      - 发送一条消息：

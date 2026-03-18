@@ -63,7 +63,7 @@ Route::group(function () {
     Route::get('ai/home_config', 'v1.ai.HomeAgent/config')->option(['real_name' => '首页引流助手配置']);
     Route::post('ai/home_chat', 'v1.ai.HomeAgent/chat')->option(['real_name' => '首页引流助手对话']);
     Route::post('ai/chat', 'v1.ai.AiController/chat')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI对话']);
-    Route::get('ai/agent_matrix', 'v1.ai.AgentMatrix/index')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体矩阵']);
+    Route::get('ai/agent_matrix', 'v1.ai.AgentMatrix/index')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI技能课超市']);
     Route::get('ai/agent/sale_info', 'v1.ai.AgentGoods/saleInfo')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体售卖信息']);
     Route::get('ai/agent/access', 'v1.ai.AgentGoods/access')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI智能体解锁校验']);
     Route::get('ai/chat/history', 'v1.ai.AiController/history')->middleware(\app\api\middleware\AuthTokenMiddleware::class, true)->option(['real_name' => 'AI对话历史']);

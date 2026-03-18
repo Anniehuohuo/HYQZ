@@ -20,14 +20,18 @@
 					<text class="searchBtnText">搜索</text>
 				</view>
 			</view>
-			<scroll-view class="cateBar" scroll-x="true" show-scrollbar="false">
+			<view class="cateBar">
 				<view class="cateInner">
-					<view class="cateItem" :class="{ active: activeCate === c.key }" v-for="c in categories" :key="c.key" @click="setCate(c.key)">
-						<text class="cateText">{{ c.name }}</text>
-						<view class="cateLine" v-if="activeCate === c.key"></view>
-					</view>
+					<scroll-view class="cateScroll" scroll-x show-scrollbar="false">
+						<view class="cateTrack">
+							<view class="cateItem" :class="{ active: activeCate === c.key }" v-for="c in categories" :key="c.key" @click="setCate(c.key)">
+							<text class="cateText">{{ c.name }}</text>
+							<view class="cateLine" v-if="activeCate === c.key"></view>
+						</view>
+						</view>
+					</scroll-view>
 				</view>
-			</scroll-view>
+			</view>
 		</view>
 
 		<view class="list">
@@ -35,12 +39,6 @@
 				<view class="agentCard" :class="{ locked: !a.unlocked, unlocked: !!a.unlocked }" v-for="a in filteredAgents" :key="a.id" @click="goChat(a)">
 					<view class="cardContent">
 						<view class="cardHeader">
-							<view class="agentAvatar" aria-hidden="true">
-								<image v-if="getAvatarUrl(a) && !avatarFailed[a.id]" class="agentAvatarImg" :src="getAvatarUrl(a)" mode="aspectFill" lazy-load @error="onAvatarError(a.id)" />
-								<view v-else class="agentAvatarFallback">
-									<text class="agentAvatarText">{{ a.abbr }}</text>
-								</view>
-							</view>
 							<view class="agentMeta">
 								<text class="agentName">{{ getDisplayName(a.name) }}</text>
 								<view class="agentTag">
@@ -82,7 +80,6 @@
 	import {
 		toLogin
 	} from '@/libs/login.js'
-	import { HTTP_REQUEST_URL } from '@/config/app'
 
 	export default {
 		mixins: [colors],
@@ -95,12 +92,10 @@
 				pdHeight: 0,
 				showBar: false,
 				sysHeight: sysHeight,
-				pageTitle: '智能体矩阵',
+				pageTitle: '技能课超市',
 				onlyUnlocked: false,
 				activeCate: 'all',
 				keyword: '',
-				avatarFailed: {},
-				avatarUrlCache: {},
 				categories: [{
 					key: 'all',
 					name: '全部'
@@ -134,7 +129,7 @@
 			this.onlyUnlocked = onlyUnlocked
 			const title = option && option.title ? String(option.title) : ''
 			if (title) this.pageTitle = title
-			else this.pageTitle = onlyUnlocked ? '我的智能体' : '智能体矩阵'
+			else this.pageTitle = onlyUnlocked ? '我的智能体' : '技能课超市'
 			// #ifdef H5 || APP-PLUS || MP
 			uni.setNavigationBarTitle({
 				title: this.pageTitle
@@ -159,14 +154,14 @@
 						})
 						if (c.agents && c.agents.length) {
 							c.agents.forEach(a => {
+								const agentName = this.pickFirstText([a.agent_name, a.name, a.title, a.abbr])
+								const agentDesc = this.pickFirstText([a.description, a.desc, a.summary, a.intro])
 								agents.push({
 									id: a.id,
 									cate: c.cate_key,
 									cateName: c.cate_name,
-									abbr: a.abbr || String(a.agent_name || '').slice(0, 1),
-									name: String(a.agent_name || ''),
-									avatar: a.avatar || '',
-									desc: String(a.description || ''),
+									name: agentName,
+									desc: agentDesc,
 									unlocked: !!a.unlocked
 								})
 							})
@@ -175,8 +170,6 @@
 
 					this.categories = cats
 					this.agents = agents
-					this.avatarFailed = {}
-					this.avatarUrlCache = {}
 				}).catch(err => {
 					// uni.showToast({ title: err.msg || '加载失败', icon: 'none' })
 				})
@@ -195,27 +188,20 @@
 				this.activeCate = 'all'
 				this.keyword = ''
 			},
-			getAvatarUrl(agent) {
-				const id = Number(agent && agent.id) || 0
-				if (!id) return ''
-				if (this.avatarUrlCache[id]) return this.avatarUrlCache[id]
-				const raw = (agent && agent.avatar) ? String(agent.avatar) : ''
-				const url = this.normalizeAvatarUrl(raw)
-				this.avatarUrlCache[id] = url
-				return url
+			normalizeText(value) {
+				if (value === null || value === undefined) return ''
+				const text = String(value).trim()
+				if (!text) return ''
+				const lower = text.toLowerCase()
+				if (lower === 'null' || lower === 'undefined') return ''
+				return text
 			},
-			normalizeAvatarUrl(url) {
-				const s = String(url || '').trim()
-				if (!s) return ''
-				if (/^https?:\/\//i.test(s)) return s
-				if (s.startsWith('//')) return 'https:' + s
-				if (s.startsWith('/')) return HTTP_REQUEST_URL + s
-				return HTTP_REQUEST_URL + '/' + s
-			},
-			onAvatarError(agentId) {
-				const id = Number(agentId) || 0
-				if (!id) return
-				this.$set(this.avatarFailed, id, true)
+			pickFirstText(candidates) {
+				for (let i = 0; i < candidates.length; i++) {
+					const text = this.normalizeText(candidates[i])
+					if (text) return text
+				}
+				return ''
 			},
 			truncateText(input, maxLen) {
 				const text = String(input || '')
@@ -226,10 +212,12 @@
 				return chars.slice(0, limit).join('') + '...'
 			},
 			getDisplayName(name) {
-				return this.truncateText(name, 8)
+				const safeName = this.normalizeText(name) || '未命名智能体'
+				return this.truncateText(safeName, 8)
 			},
 			getDisplayDesc(desc) {
-				return this.truncateText(desc, 20)
+				const safeDesc = this.normalizeText(desc) || '暂无介绍'
+				return this.truncateText(safeDesc, 20)
 			},
 			goChat(agent) {
 				const agentId = Number(agent && agent.id) || 0
@@ -333,11 +321,13 @@
 		height: 64rpx;
 		padding: 0 24rpx;
 		border-radius: 16rpx;
-		background: linear-gradient(135deg, var(--view-main-start) 0%, var(--view-main-over) 100%);
+		background: linear-gradient(135deg, var(--view-main-start, rgb(233,213,222)) 0%, var(--view-main-over, rgb(200, 166, 181)) 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 4rpx 10rpx rgba(241, 165, 92, 0.3);
+		box-shadow: 0 4rpx 10rpx rgba(193, 135, 162, 0.3);
+		min-width: 112rpx;
+		flex: none;
 	}
 
 	.searchBtnText {
@@ -349,18 +339,27 @@
 	.cateBar {
 		margin-top: 24rpx;
 		width: 100%;
-		white-space: nowrap;
 	}
 
 	.cateInner {
-		display: flex;
-		gap: 32rpx;
 		padding: 0 8rpx 12rpx;
+	}
+
+	.cateScroll {
+		width: 100%;
+		white-space: nowrap;
+	}
+
+	.cateTrack {
+		display: inline-flex;
+		align-items: center;
+		gap: 18rpx;
+		padding-right: 24rpx;
 	}
 
 	.cateItem {
 		position: relative;
-		padding: 10rpx 0;
+		padding: 10rpx 4rpx;
 		flex: none;
 	}
 
@@ -431,7 +430,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		padding: 16px 20px;
+		padding: 14px 15px;
 	}
 	
 	.agentCard.unlocked {
@@ -519,7 +518,7 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		margin-bottom: 10px;
+		margin-bottom: 5px;
 	}
 
 	.agentAvatar {
@@ -576,6 +575,7 @@
 
 	.agentTag {
 		display: inline-flex;
+		padding-top: 2px;
 	}
 
 	.agentTagText {
@@ -596,6 +596,7 @@
 		-webkit-line-clamp: 2;
 		overflow: hidden;
 		margin-top: 2px;
+		height-min: 40px;
 	}
 
 	.empty {

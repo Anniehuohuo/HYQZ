@@ -84,12 +84,7 @@ function _toLogin(push, pathLogin) {
 	// #endif
 
 	// #ifdef MP
-	let url
-	if (!BASIC_CONFIG.wechat_auth_switch) {
-		url = '/pages/users/binding_phone/index?pageType=0'
-	} else {
-		url = '/pages/users/wechat_login/index'
-	}
+	let url = '/pages/users/wechat_login/index'
 	uni.navigateTo({
 		url
 	})

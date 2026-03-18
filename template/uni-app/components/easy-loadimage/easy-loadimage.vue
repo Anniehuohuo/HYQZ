@@ -53,7 +53,7 @@
 			viewHeight: {
 				type: Number,
 				default () {
-					return uni.getSystemInfoSync().windowHeight;
+					return uni.getWindowInfo().windowHeight;
 				}
 			},
 			width:{
@@ -161,41 +161,41 @@
 	}
 
 	/* 官方优化图片tips */
-	image {
+	.origin-img, .border-img {
 		will-change: transform
 	}
 
 	/* 渐变过渡效果处理 */
-	image.origin-img {
+	.origin-img {
 		width: 100%;
 		height: 100%;
 		opacity: 0.3;
 		/* max-height: 360rpx; */
 	}
 
-	image.origin-img.show-transition {
+	.origin-img.show-transition {
 		transition: opacity .5s;
 		opacity: 1;
 	}
 
-	image.origin-img.no-transition {
+	.origin-img.no-transition {
 		opacity: 1;
 	}
 
 	/* 渐变过渡效果处理 */
-	image.border-img {
+	.border-img {
 		width: 100%;
 		height: 100%;
 		opacity: 0.3;
 		/* max-height: 360rpx; */
 	}
 
-	image.border-img.show-transition {
+	.border-img.show-transition {
 		transition: opacity .5s;
 		opacity: 1;
 	}
 
-	image.border-img.no-transition {
+	.border-img.no-transition {
 		opacity: 1;
 	}
 

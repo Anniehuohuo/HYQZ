@@ -1,6 +1,18 @@
 <template>
 	<view class="page">
-		<scroll-view scroll-y="true" class="scroll">
+		<!-- #ifdef MP || APP-PLUS -->
+		<view class="sys-head">
+			<view class="sys-bar" :style="{ height: sysHeight }"></view>
+			<view class="sys-nav">
+				<view class="sys-back" @tap="goBack">
+					<text class="iconfont icon-xiangzuo"></text>
+				</view>
+				<view class="sys-title">家长课堂</view>
+				<view class="sys-side"></view>
+			</view>
+		</view>
+		<!-- #endif -->
+		<scroll-view scroll-y="true" class="scroll" :style="{ height: scrollHeight }">
 			<view class="hero">
 				<view class="heroTitle">家长课堂</view>
 				<view class="heroSub">给家长的一份“可直接照做”的养育方法清单</view>
@@ -52,6 +64,9 @@
 export default {
 	data() {
 		return {
+			sysHeight: '0px',
+			customNavEnabled: false,
+			customNavHeightPx: 0,
 			sections: [
 				{
 					title: '情绪先行：先接住情绪，再谈道理',
@@ -94,7 +109,44 @@ export default {
 			}
 		};
 	},
+	computed: {
+		scrollHeight() {
+			if (!this.customNavEnabled) return '100vh'
+			return `calc(100vh - ${Number(this.customNavHeightPx || 0)}px)`
+		}
+	},
+	onLoad() {
+		let statusBar = 0
+		try {
+			const sys = uni.getSystemInfoSync()
+			statusBar = Number(sys && sys.statusBarHeight ? sys.statusBarHeight : 0) || 0
+			if (statusBar <= 0 && uni.getMenuButtonBoundingClientRect) {
+				const menuRect = uni.getMenuButtonBoundingClientRect()
+				statusBar = Number(menuRect && menuRect.top ? menuRect.top : 0) || 0
+			}
+		} catch (e) {
+			statusBar = 0
+		}
+		if (statusBar <= 0) statusBar = 20
+		this.sysHeight = `${statusBar}px`
+		// #ifdef MP || APP-PLUS
+		this.customNavEnabled = true
+		// #endif
+		this.customNavHeightPx = statusBar + 43
+	},
 	methods: {
+		goBack() {
+			const pages = getCurrentPages()
+			if (pages && pages.length > 1) {
+				uni.navigateBack({
+					delta: 1
+				})
+				return
+			}
+			uni.switchTab({
+				url: '/pages/ai/index'
+			})
+		},
 		openTip(key) {
 			const map = {
 				emotion: {
@@ -137,6 +189,40 @@ export default {
 .page {
 	min-height: 100vh;
 	background: #f6f7fb;
+}
+
+.sys-head {
+	background: #f6f7fb;
+}
+
+.sys-nav {
+	height: 43px;
+	display: flex;
+	align-items: center;
+}
+
+.sys-back,
+.sys-side {
+	width: 88rpx;
+	height: 43px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+}
+
+.sys-back .iconfont {
+	font-size: 34rpx;
+	color: #111827;
+}
+
+.sys-title {
+	flex: 1;
+	text-align: center;
+	line-height: 43px;
+	font-size: 36rpx;
+	color: #333;
+	font-weight: 600;
 }
 .scroll {
 	height: 100vh;
@@ -235,7 +321,8 @@ export default {
 	line-height: 40rpx;
 }
 .safePad {
-	height: 40rpx;
+	height: 10rpx;
+	background-color: white;
 }
 
 .popupMask {

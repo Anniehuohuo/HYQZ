@@ -2,7 +2,7 @@
   <div>
     <el-card :bordered="false" shadow="never" class="ivu-mb-16">
       <div slot="header" class="clearfix">
-        <span>智能体矩阵</span>
+        <span>技能课超市</span>
       </div>
       <el-tabs v-model="activeTab">
         <el-tab-pane label="智能体" name="agents">

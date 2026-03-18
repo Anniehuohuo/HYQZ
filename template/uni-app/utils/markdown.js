@@ -32,7 +32,7 @@ function isHrLine(line) {
 	return false
 }
 
-function markdownToHtml(text) {
+export function markdownToHtml(text) {
 	const src = String(text || '').replace(/\r\n/g, '\n')
 	const lines = src.split('\n')
 	let html = ''
@@ -147,7 +147,7 @@ function markdownToHtml(text) {
 	return html
 }
 
-module.exports = {
+export default {
 	markdownToHtml
 }
 

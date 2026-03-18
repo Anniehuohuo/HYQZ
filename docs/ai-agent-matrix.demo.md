@@ -1,4 +1,4 @@
-# AI智能体矩阵（管理员配置 + 用户端读取）演示说明
+# AI技能课超市（管理员配置 + 用户端读取）演示说明
 
 ## 技术栈
 - 后端：ThinkPHP（CRMEb 项目结构）
@@ -13,7 +13,7 @@
 
 ## 2. 管理员后台配置（分类/智能体）
 1. 登录后台管理端（现有登录流程不变）。
-2. 进入菜单：智能体中心 → 智能体矩阵。
+2. 进入菜单：智能体中心 → 技能课超市。
 3. 在“分类”页签：
    - 新增分类：填写 cate_key / cate_name / sort / status
    - 编辑分类：修改上述字段
@@ -30,7 +30,7 @@
 - [ai.js](file:///d:/HYQZ3/template/admin/src/api/ai.js)
 
 ## 3. 让用户端矩阵读取数据库配置
-用户端“智能体矩阵”页面会调用接口 `/api/ai/agent_matrix`，返回启用的分类与启用的智能体（并附带 tags 数组与 abbr）。
+用户端“技能课超市”页面会调用接口 `/api/ai/agent_matrix`，返回启用的分类与启用的智能体（并附带 tags 数组与 abbr）。
 
 用户端页面代码：
 - [agents.vue](file:///d:/HYQZ3/template/uni-app/pages/ai/agents.vue)

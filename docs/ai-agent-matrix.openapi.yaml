@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: AI智能体矩阵接口
+  title: AI技能课超市接口
   version: 1.0.0
   description: |
-    用于“智能体矩阵”配置与用户端读取/对话选择。
+    用于“技能课超市”配置与用户端读取/对话选择。
     统一返回结构：{ status, msg, data? }，其中 status=200 表示成功，status=400 表示失败。
 servers:
   - url: /
@@ -61,7 +61,7 @@ components:
 paths:
   /api/ai/agent_matrix:
     get:
-      summary: 用户端获取智能体矩阵（启用的分类与智能体）
+      summary: 用户端获取技能课超市（启用的分类与智能体）
       responses:
         "200":
           description: OK

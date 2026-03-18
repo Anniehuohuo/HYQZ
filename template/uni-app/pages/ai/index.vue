@@ -1,5 +1,12 @@
 <template>
 	<view class="page" :style="[colorStyle, pagePad]">
+		<!-- #ifdef MP || APP-PLUS -->
+		<view class="sys-head">
+			<view class="sys-bar" :style="{ height: sysHeight }"></view>
+			<view class="sys-title">慧圆智慧父母</view>
+			<view class="bg"></view>
+		</view>
+		<!-- #endif -->
 		<view class="pageFx"></view>
 		<scroll-view class="chat" :style="{ height: chatHeight }" scroll-y="true" :scroll-top="scrollTop" @scrolltolower="noop" :lower-threshold="60">
 			<view class="chatInner">
@@ -27,6 +34,7 @@
 					<view class="msg" v-for="(m, mi) in safeMessages" :key="m.id || ('m_' + mi)" :class="m.role === 'user' ? 'user' : 'bot'">
 						<view class="bubble" v-if="m.text">
 							<text class="bubbleText">{{ m.text }}</text>
+							<text class="bubbleAiTag" v-if="m.role !== 'user'">AI生成</text>
 						</view>
 						<view class="disambig" v-if="m.options && m.options.length">
 							<view class="disambigBtn" v-for="o in (m.options || []).filter(Boolean)" :key="o.id || (o.name || '')" @click="chooseDisambig(mi, o)">
@@ -54,7 +62,7 @@
 						</view>
 						<view class="matrixCta" v-if="m.matrixCta">
 							<view class="matrixBtn" @click="goAgentMatrix">
-								<text class="matrixBtnText">去智能体矩阵聊</text>
+								<text class="matrixBtnText">去技能课超市聊</text>
 							</view>
 						</view>
 					</view>
@@ -66,25 +74,29 @@
 					</view>
 				</view>
 			</view>
+			
 		</scroll-view>
 
 		<view class="composer" :style="{ bottom: footerBottom }">
+			
 			<view class="composerInner">
-				<view class="leftBadge" @click="clearChat">
-					<text class="iconfont icon-shanchu31 leftIcon"></text>
-				</view>
-				<input class="input" v-model="draft" :adjust-position="true" confirm-type="send" placeholder="继续对话..." @confirm="send" />
-				<view class="send" :class="{ disabled: !draftTrim }" @click="send">
-					<text class="iconfont icon-fasong sendIcon"></text>
+				<view class="composerButtons">
+					<view class="leftBadge" @tap.stop="clearChat">
+						<text class="iconfont icon-shanchu31 leftIcon"></text>
+					</view>
+					<textarea class="ai-textarea" v-model="draft" :adjust-position="false" :cursor-spacing="0" :show-confirm-bar="false" :auto-height="true" placeholder="继续对话..." placeholder-style="line-height: 62rpx; text-align: center;" maxlength="-1" @focus="onComposerFocus" @blur="onComposerBlur" />
+					<view class="addBadge" @tap.stop="uploadFile">
+						<text class="iconfont icon-tianjia1 addIcon"></text>
+					</view>
+					<view class="send" :class="{ disabled: !draftTrim }" @tap.stop="send">
+						<text class="iconfont icon-fasong sendIcon"></text>
+					</view>
 				</view>
 			</view>
-			<view class="aiDisclaimer">
-				<text class="aiDisclaimerText">本服务为AI生成内容，结果仅供参考</text>
-			</view>
-			<view class="safePad"></view>
+			<!-- <view class="safePad"></view> -->
 		</view>
-
-		<pageFooter @newDataStatus="newDataStatus" v-show="showBar"></pageFooter>
+		<view class="bottomGapWhite" v-if="keyboardHeight <= 0" :style="{ height: footerBottom }"></view>
+		<pageFooter @newDataStatus="newDataStatus"></pageFooter>
 	</view>
 </template>
 
@@ -100,6 +112,7 @@
 	} from '@/config/app.js'
 	import pageFooter from '@/components/pageFooter/index.vue'
 	import { toLogin } from '@/libs/login.js'
+	import store from '@/store'
 
 	function uid() {
 		return `${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -158,6 +171,15 @@
 				isFooter: false,
 				pdHeight: 0,
 				showBar: false,
+				footerHeightPx: 0,
+				safeAreaBottomPx: 0,
+				composerHeightPx: 0,
+				windowHeightBase: 0,
+				windowHeightNow: 0,
+				sysHeight: '0px',
+				customNavEnabled: false,
+				customNavHeightPx: 0,
+				keyboardEffective: 0,
 				showIntro: true,
 				homeAgentEnabled: true,
 				heroTitle: '小圆为你服务',
@@ -169,11 +191,14 @@
 				draft: '',
 				sending: false,
 				scrollTop: 0,
+				scrollTopSeed: 0,
 				replyCount: 0,
 				turnCount: 0,
 				lastRecommendedId: 0,
 				sessionId: '',
 				agentId: 'hyqz_default',
+				keyboardHeight: 0,
+				keyboardHandler: null,
 				messages: [],
 				suggestions: ['孩子顶嘴很严重', '写作业太拖拉', '情绪失控后怎么修复', '手机规则怎么立'],
 				recommendProducts: []
@@ -181,6 +206,10 @@
 		},
 		onLoad(options) {
 			this.agentId = (options && options.agentId) ? String(options.agentId) : 'hyqz_default'
+			// #ifdef MP || APP-PLUS
+			this.customNavEnabled = true
+			// #endif
+			this.initLayoutMetrics()
 			this.sessionId = this.getOrCreateSessionId(this.agentId)
 			this.loadHomeAgentConfig()
 			this.loadRecommendProducts()
@@ -204,24 +233,23 @@
 				this.shareInfo = res.data || {}
 			})
 			this.heroLogoSrc = this.buildHeroSvg()
-			if (!this.messages || !this.messages.length) {
-				this.messages = [{
-					id: uid(),
-					role: 'bot',
-					text: '把发生的场景描述给我：谁、在什么时间、说了什么、你怎么回应的？我会给你一套可执行的沟通步骤。',
-					cards: []
-				}]
-			}
+			this.registerKeyboardListener()
 		},
 		onHide() {
+			this.keyboardHeight = 0
+			this.keyboardEffective = 0
+			this.unregisterKeyboardListener()
 			this.saveChatState()
 		},
 		onUnload() {
+			this.keyboardHeight = 0
+			this.keyboardEffective = 0
+			this.unregisterKeyboardListener()
 			this.saveChatState()
 		},
 		computed: {
 			pagePad() {
-				if (this.isFooter) {
+				if (this.isFooter && this.keyboardHeight <= 0) {
 					return {
 						paddingBottom: `${this.pdHeight * 2 + 140}rpx`
 					}
@@ -233,13 +261,40 @@
 				if (!this.isFooter) return 0
 				return this.pdHeight * 2 + 120
 			},
+			rpxUnitToPx() {
+				if (typeof uni !== 'undefined' && typeof uni.upx2px === 'function') {
+					return (v) => Number(uni.upx2px(Number(v) || 0)) || 0
+				}
+				return (v) => Number(v) || 0
+			},
 			footerBottom() {
-				if (!this.isFooter) return '0rpx'
-				return `${this.footerOffsetRpx}rpx`
+				const toPx = this.rpxUnitToPx
+				const footerMeasuredPx = Number(this.footerHeightPx || 0) || 0
+				const footerDefaultPx = toPx(112) + (Number(this.safeAreaBottomPx || 0) || 0)
+				const footerFallbackPx = this.isFooter ? footerDefaultPx : 0
+				const footerRawPx = this.isFooter ? (footerMeasuredPx > 0 ? footerMeasuredPx : footerFallbackPx) : 0
+				const footerMaxPx = footerDefaultPx + toPx(56)
+				const footerPx = this.isFooter ? Math.min(Math.max(footerRawPx, footerDefaultPx), footerMaxPx) : 0
+				const footerVisiblePx = this.keyboardHeight > 0 ? 0 : footerPx
+				const keyboardPx = this.keyboardEffective > 0 ? this.keyboardEffective : 0
+				return `${Math.max(0, footerVisiblePx + keyboardPx)}px`
 			},
 			chatHeight() {
-				if (!this.isFooter) return 'calc(100vh - 160rpx)'
-				return `calc(100vh - 160rpx - ${this.footerOffsetRpx}rpx)`
+				const toPx = this.rpxUnitToPx
+				const composerBasePx = Number(this.composerHeightPx || 0) || toPx(112)
+				const footerMeasuredPx = Number(this.footerHeightPx || 0) || 0
+				const footerDefaultPx = toPx(112) + (Number(this.safeAreaBottomPx || 0) || 0)
+				const footerFallbackPx = this.isFooter ? footerDefaultPx : 0
+				const footerRawPx = this.isFooter ? (footerMeasuredPx > 0 ? footerMeasuredPx : footerFallbackPx) : 0
+				const footerMaxPx = footerDefaultPx + toPx(56)
+				const footerPx = this.isFooter ? Math.min(Math.max(footerRawPx, footerDefaultPx), footerMaxPx) : 0
+				const footerVisiblePx = this.keyboardHeight > 0 ? 0 : footerPx
+				const keyboardPx = this.keyboardEffective > 0 ? this.keyboardEffective : 0
+				const customNavPx = this.customNavEnabled ? (Number(this.customNavHeightPx || 0) || 0) : 0
+				const reservedPx = Math.max(0, composerBasePx + footerVisiblePx + keyboardPx + customNavPx)
+				const wh = Number(this.windowHeightNow || 0) || 0
+				if (wh > 0) return `${Math.max(0, wh - reservedPx)}px`
+				return `calc(100vh - ${reservedPx}px)`
 			},
 			draftTrim() {
 				return (this.draft || '').trim()
@@ -250,6 +305,115 @@
 			}
 		},
 		methods: {
+			initLayoutMetrics() {
+				let wh = 0
+				let safeBottom = 0
+				let statusBar = 0
+				try {
+					const sys = uni.getSystemInfoSync()
+					wh = Number(sys && sys.windowHeight ? sys.windowHeight : 0) || 0
+					safeBottom = Number(sys && sys.safeAreaInsets && sys.safeAreaInsets.bottom ? sys.safeAreaInsets.bottom : 0) || 0
+					statusBar = Number(sys && sys.statusBarHeight ? sys.statusBarHeight : 0) || 0
+				} catch (e) {
+					wh = 0
+					safeBottom = 0
+					statusBar = 0
+				}
+				this.windowHeightBase = wh
+				this.windowHeightNow = wh
+				this.safeAreaBottomPx = safeBottom
+				this.sysHeight = `${statusBar}px`
+				this.customNavHeightPx = statusBar + 43
+				this.$nextTick(() => {
+					this.measureComposerHeight()
+				})
+			},
+			measureComposerHeight() {
+				if (typeof uni === 'undefined' || typeof uni.createSelectorQuery !== 'function') return
+				try {
+					uni.createSelectorQuery()
+						.in(this)
+						.select('.composer')
+						.boundingClientRect((rect) => {
+							const h = rect && rect.height ? Number(rect.height) : 0
+							if (h > 0) this.composerHeightPx = h
+						})
+						.exec()
+				} catch (e) {}
+			},
+			refreshWindowHeight() {
+				let wh = 0
+				try {
+					const sys = uni.getSystemInfoSync()
+					wh = Number(sys && sys.windowHeight ? sys.windowHeight : 0) || 0
+				} catch (e) {
+					wh = 0
+				}
+				if (wh > 0) this.windowHeightNow = wh
+				return wh
+			},
+			applyKeyboardHeight(h) {
+				const wh = this.refreshWindowHeight()
+				const base = Number(this.windowHeightBase || 0) || 0
+				if (h > 0 && base > 0 && wh > 0 && wh < base - 40) {
+					this.keyboardEffective = 0
+				} else {
+					this.keyboardEffective = h > 0 ? h : 0
+				}
+			},
+			uploadFile() {
+				uni.showToast({
+					title: '功能开发中',
+					icon: 'none'
+				})
+			},
+			registerKeyboardListener() {
+				if (typeof uni.onKeyboardHeightChange !== 'function') return
+				if (this.keyboardHandler) return
+				const handler = (res) => {
+					const h = Number((res && res.height) || 0) || 0
+					this.keyboardHeight = h
+					this.applyKeyboardHeight(h)
+					this.$nextTick(() => {
+						this.measureComposerHeight()
+					})
+					if (h > 0) this.scrollToBottom()
+				}
+				this.keyboardHandler = handler
+				try {
+					uni.onKeyboardHeightChange(handler)
+				} catch (e) {}
+			},
+			unregisterKeyboardListener() {
+				if (!this.keyboardHandler) return
+				if (typeof uni.offKeyboardHeightChange === 'function') {
+					try {
+						uni.offKeyboardHeightChange(this.keyboardHandler)
+					} catch (e) {}
+				}
+				this.keyboardHandler = null
+			},
+			onComposerFocus(e) {
+				const h = Number((e && e.detail && e.detail.height) || 0) || 0
+				this.scrollToBottom()
+				setTimeout(() => {
+					this.scrollToBottom()
+				}, 120)
+				if (h > 0) {
+					this.keyboardHeight = h
+					this.applyKeyboardHeight(h)
+					this.$nextTick(() => {
+						this.measureComposerHeight()
+					})
+				}
+			},
+			onComposerBlur() {
+				this.keyboardHeight = 0
+				this.keyboardEffective = 0
+				this.$nextTick(() => {
+					this.measureComposerHeight()
+				})
+			},
 			getChatStateStorageKey() {
 				return `home_ai_chat_state:${this.agentId || 'hyqz_default'}`
 			},
@@ -262,11 +426,25 @@
 				}
 				if (!state || typeof state !== 'object') return
 				const msgs = Array.isArray(state.messages) ? state.messages.filter(m => m && typeof m === 'object') : []
-				if (!msgs.length) return
-				this.messages = msgs
 				this.turnCount = Number(state.turnCount || 0) || 0
 				this.replyCount = Number(state.replyCount || 0) || 0
 				this.lastRecommendedId = Number(state.lastRecommendedId || 0) || 0
+				if (!msgs.length) {
+					this.messages = []
+					this.showIntro = true
+					return
+				}
+				const hasUserMessage = msgs.some(m => String((m && m.role) || '') === 'user' && (String((m && m.text) || '').trim() || m.file))
+				const hasConversation = hasUserMessage || this.turnCount > 0 || this.replyCount > 0
+				if (!hasConversation) {
+					this.messages = []
+					this.turnCount = 0
+					this.replyCount = 0
+					this.lastRecommendedId = 0
+					this.showIntro = true
+					return
+				}
+				this.messages = msgs
 				this.showIntro = false
 			},
 			saveChatState() {
@@ -308,12 +486,7 @@
 						this.replyCount = 0
 						this.turnCount = 0
 						this.lastRecommendedId = 0
-						this.messages = [{
-							id: uid(),
-							role: 'bot',
-							text: '把发生的场景描述给我：谁、在什么时间、说了什么、你怎么回应的？我会给你一套可执行的沟通步骤。',
-							cards: []
-						}]
+						this.messages = []
 						this.showIntro = true
 					}
 				})
@@ -489,6 +662,15 @@
 				this.isFooter = !!val
 				this.showBar = !!val
 				this.pdHeight = num || 0
+				const h = arguments.length >= 3 ? Number(arguments[2] || 0) : 0
+				if (this.isFooter && h > 0) {
+					this.footerHeightPx = h
+				} else if (!this.isFooter) {
+					this.footerHeightPx = 0
+				}
+				this.$nextTick(() => {
+					this.measureComposerHeight()
+				})
 			},
 			noop() {
 			},
@@ -582,7 +764,8 @@
 			},
 			scrollToBottom() {
 				this.$nextTick(() => {
-					this.scrollTop = 999999
+					this.scrollTopSeed += 1
+					this.scrollTop = 900000 + this.scrollTopSeed
 				})
 			},
 			send() {
@@ -604,6 +787,20 @@
 					text
 				})
 				this.saveChatState()
+				const token = store && store.state && store.state.app ? store.state.app.token : ''
+				if (!token) {
+					this.messages.push({
+						id: uid(),
+						role: 'bot',
+						text: '请先登录后继续对话，我将带你进入登录页面。'
+					})
+					this.saveChatState()
+					this.scrollToBottom()
+					setTimeout(() => {
+						toLogin()
+					}, 500)
+					return
+				}
 				this.sending = true
 				this.scrollToBottom()
 
@@ -800,6 +997,27 @@
 		background: linear-gradient(180deg, rgba(241, 165, 92, 0.52) 0%, rgba(249, 233, 200, 0.96) 62%, #fff7ef 100%);
 	}
 
+	.sys-head {
+		position: relative;
+		width: 100%;
+		z-index: 3;
+		box-shadow: 0 10rpx 24rpx rgba(31, 35, 41, 0.10);
+		.bg {
+			display: none;
+		}
+	}
+
+	.sys-title {
+		z-index: 10;
+		position: relative;
+		height: 43px;
+		text-align: center;
+		line-height: 43px;
+		font-size: 36rpx;
+		color: #333;
+		font-weight: 600;
+	}
+
 	.pageFx {
 		position: fixed;
 		left: 0;
@@ -859,7 +1077,7 @@
 	.heroSub {
 		margin-top: 10rpx;
 		display: block;
-		font-size: 24rpx;
+		font-size: 26rpx;
 		line-height: 36rpx;
 		color: rgba(31, 35, 41, 0.64);
 	}
@@ -933,10 +1151,12 @@
 		padding: 18rpx 18rpx;
 		border-radius: 18rpx;
 		box-shadow: 0rpx 10rpx 30rpx rgba(0, 0, 0, 0.06);
+		display: flex;
+		flex-direction: column;
 	}
 
 	.msg.user .bubble {
-		background: linear-gradient(135deg, var(--view-main-start) 0%, var(--view-main-over) 100%);
+		background: #da7e28;
 		border-top-right-radius: 6rpx;
 	}
 
@@ -946,9 +1166,17 @@
 	}
 
 	.bubbleText {
-		font-size: 26rpx;
-		line-height: 40rpx;
+		font-size: 32rpx;
+		line-height: 48rpx;
 		color: rgba(31, 35, 41, 0.92);
+	}
+
+	.bubbleAiTag {
+		margin-top: 8rpx;
+		align-self: flex-end;
+		font-size: 24rpx;
+		line-height: 28rpx;
+		color: rgba(31, 35, 41, 0.45);
 	}
 
 	.msg.user .bubbleText {
@@ -1124,79 +1352,121 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		padding: 16rpx 18rpx 0;
-		background: transparent;
-		z-index: 2;
+		padding: 16rpx 5rpx 16rpx;
+		background: #fff;
+		box-shadow: 0rpx -5rpx 20rpx rgba(31, 35, 41, 0.10);
+		z-index: 998;
+	}
+	.bottomGapWhite {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: #fff;
+		z-index: 997;
+		pointer-events: none;
 	}
 
 	.composerInner {
 		display: flex;
-		align-items: center;
-		gap: 12rpx;
-		padding: 10rpx 10rpx;
-		border-radius: 999rpx;
-		background: rgba(255, 255, 255, 0.88);
-		backdrop-filter: blur(12px);
-		border: 1rpx solid rgba(255, 255, 255, 0.6);
-		box-shadow: 0rpx 18rpx 46rpx rgba(31, 35, 41, 0.16);
+		flex-direction: column;
+		background: transparent;
+		border-radius: 24rpx;
+		border: none;
+		overflow: hidden;
 	}
 
-	.leftBadge {
-		width: 72rpx;
-		height: 72rpx;
-		border-radius: 50%;
-		background: linear-gradient(135deg, rgba(241, 165, 92, 0.20) 0%, rgba(241, 165, 92, 0.07) 100%);
+	.composerButtons {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 2rpx;
+		padding: 8rpx 15rpx;
+	}
+
+	.addBadge {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 12rpx;
+		background: transparent;
+		border: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex: none;
+		align-self: center;
 	}
 
-	.leftIcon {
-		font-size: 34rpx;
-		color: rgba(241, 165, 92, 0.92);
+	.addIcon {
+		font-size: 54rpx;
+		padding: 0;
+		color: #e98f36;
 	}
 
-	.input {
-		flex: 1;
-		height: 72rpx;
-		padding: 0 12rpx;
-		border-radius: 999rpx;
+	.leftBadge {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 12rpx;
 		background: transparent;
-		font-size: 26rpx;
-		color: #1f2329;
-	}
-
-	.send {
-		width: 72rpx;
-		height: 72rpx;
-		border-radius: 50%;
-		background: linear-gradient(135deg, var(--view-main-start) 0%, var(--view-main-over) 100%);
+		border: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex: none;
+		align-self: center;
+	}
+
+	.leftIcon {
+		font-size: 54rpx;
+		padding: 0;
+		color: #e98f36;
+	}
+	.ai-textarea {
+		flex: 0.92;
+		min-width: 0;
+		min-height: 90rpx;
+		max-height: 150rpx;
+		padding: 14rpx 18rpx;
+		background: #f5f6f7;
+		border: 1rpx solid rgba(31, 35, 41, 0.12);
+		border-radius: 12rpx;
+		font-size: 30rpx;
+		color: #1f2329;
+		line-height: 1.4;
+		box-sizing: border-box;
+		word-break: break-all;
+		white-space: pre-wrap;
+	}
+
+	.send {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 12rpx;
+		background: transparent;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		align-self: center;
 	}
 
 	.send.disabled {
-		opacity: 0.5;
+		background: transparent;
+		opacity: 0.35;
 	}
-
 	.sendIcon {
-		font-size: 32rpx;
-		color: rgba(255, 255, 255, 0.98);
+		font-size: 54rpx;
+		padding: 0;
+		color: #e98f36;
+	}
+	.send.disabled .sendIcon {
+		color: #e98f36;
 	}
 
 	.safePad {
 		height: env(safe-area-inset-bottom);
+		background-color: #fff;
 	}
 	
-	.aiDisclaimer {
-		margin-top: 10rpx;
-		text-align: center;
-	}
-	
-	.aiDisclaimerText {
-		font-size: 22rpx;
-		color: rgba(31, 35, 41, 0.45);
-	}
 </style>

@@ -495,6 +495,13 @@ function textFromBlocks(blocks) {
 		width: 100%;
 	}
 
+	.fallback,
+	.fallbackText {
+		font-size: 32rpx;
+		line-height: 48rpx;
+		color: #1f2329;
+	}
+
 	.h1 {
 		font-size: 38rpx;
 		line-height: 52rpx;
@@ -519,8 +526,8 @@ function textFromBlocks(blocks) {
 
 	.p {
 		margin: 6rpx 0;
-		font-size: 26rpx;
-		line-height: 40rpx;
+		font-size: 32rpx;
+		line-height: 48rpx;
 		color: rgba(31, 35, 41, 0.92);
 		word-break: break-word;
 		white-space: pre-wrap;
@@ -557,6 +564,8 @@ function textFromBlocks(blocks) {
 	.liBullet {
 		width: 32rpx;
 		flex: none;
+		font-size: 32rpx;
+		line-height: 48rpx;
 		color: rgba(31, 35, 41, 0.55);
 	}
 

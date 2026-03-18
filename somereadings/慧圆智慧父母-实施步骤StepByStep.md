@@ -23,7 +23,7 @@
 现状：tabBar 是“首页/分类/购物车/我的”，配置在 [pages.json](file:///d:/AIProject/MINI/HYQZ/template/uni-app/pages.json)。
 
 动作：
-- 将 tabBar 调整为“首页（对话）/智能体矩阵/论坛/我的”
+- 将 tabBar 调整为“首页（对话）/技能课超市/论坛/我的”
 - 对应 pagePath 先指向新建页面路径（页面可以先是空壳）
 
 输出物：
@@ -33,7 +33,7 @@
 
 建议页面（命名可调整）：
 - 首页对话：`pages/ai/index`
-- 智能体矩阵：`pages/ai/agents`
+- 技能课超市：`pages/ai/agents`
 - 论坛：`pages/forum/index`
 - 我的：可沿用现有 `pages/user/index`（先不改结构）
 

@@ -4,17 +4,18 @@
 			"path": "pages/ai/index",
 			"style": {
 				"navigationBarTitleText": "慧圆智慧父母",
-				"navigationStyle": "default",
 				"navigationBarBackgroundColor": "#fff3e6",
-				"navigationBarTextStyle": "black",
-				"enableShareAppMessage": true,
-				"enableShareTimeline": true
+				"navigationBarTextStyle": "black"
+				// #ifdef MP || APP-PLUS
+				,
+				"navigationStyle": "custom"
+				// #endif
 			}
 		},
 		{
 			"path": "pages/ai/agents",
 			"style": {
-				"navigationBarTitleText": "智能体矩阵",
+				"navigationBarTitleText": "技能课超市",
 				"navigationBarBackgroundColor": "#eef2f3",
 				// #ifdef MP || APP-PLUS
 				"navigationStyle": "custom",
@@ -26,9 +27,12 @@
 			"path": "pages/ai/chat",
 			"style": {
 				"navigationBarTitleText": "对话",
-				"navigationStyle": "default",
 				"navigationBarBackgroundColor": "#fff3e6",
 				"navigationBarTextStyle": "black"
+				// #ifdef MP || APP-PLUS
+				,
+				"navigationStyle": "custom"
+				// #endif
 			}
 		},
 		{
@@ -159,6 +163,10 @@
 						"navigationBarTitleText": "家长课堂",
 						"navigationBarBackgroundColor": "#f6f7fb",
 						"navigationBarTextStyle": "black"
+						// #ifdef MP || APP-PLUS
+						,
+						"navigationStyle": "custom"
+						// #endif
 					}
 				}
 			]
@@ -1082,7 +1090,6 @@
 				"path": "index",
 				"style": {
 					"navigationStyle": "custom",
-					"transparentTitle": "auto",
 					"app-plus": {
 						// #ifdef APP-PLUS
 						"titleNView": {
@@ -1686,7 +1693,9 @@
 		"navigationBarTitleText": "加载中",
 		"navigationBarBackgroundColor": "#fff",
 		"backgroundColor": "#F8F8F8",
+		// #ifdef APP-PLUS
 		"titleNView": false,
+		// #endif
 		"pageOrientation": "portrait"
 	},
 	"condition": {

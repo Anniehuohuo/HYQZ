@@ -34,8 +34,6 @@
 						{{$t(`授权登录`)}}
 					</button>
 				</template>
-				<button v-if="configData.phone_auth_switch" hover-class="none" @click="phoneLogin"
-					class="btn2">{{$t(`手机号登录`)}}</button>
 				<view class="cancel-login" @click="onReject">取消登录</view>
 				<!-- #endif -->
 			</view>
@@ -284,12 +282,6 @@
 			editSuccess() {
 				this.isShow = false
 			},
-			phoneLogin() {
-				uni.navigateTo({
-					url: `/pages/users/binding_phone/index?authKey=${this.authKey}&pageType=0`
-				})
-			},
-			
 			closeEdit() {
 				this.isShow = false
 				this.$util.Tips({

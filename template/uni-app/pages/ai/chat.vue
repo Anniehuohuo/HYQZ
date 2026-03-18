@@ -1,6 +1,19 @@
 <template>
 	<view class="page" :style="[colorStyle, pagePad]">
-		<scroll-view class="chat" scroll-y="true" :scroll-top="scrollTop" @scrolltolower="noop" :lower-threshold="60">
+		<!-- #ifdef MP || APP-PLUS -->
+		<view class="sys-head">
+			<view class="sys-bar" :style="{ height: sysHeight }"></view>
+			<view class="sys-nav">
+				<view class="sys-back" @tap="goBack">
+					<text class="iconfont icon-xiangzuo"></text>
+				</view>
+				<view class="sys-title">{{ title || '对话' }}</view>
+				<view class="sys-side"></view>
+			</view>
+			<view class="bg"></view>
+		</view>
+		<!-- #endif -->
+		<scroll-view class="chat" :style="{ top: chatTop, bottom: chatBottom }" scroll-y="true" :scroll-top="scrollTop" @scrolltolower="noop" :lower-threshold="60">
 			<view class="chatInner">
 				<view class="intro" v-if="showIntro">
 					<view class="introTop">
@@ -18,9 +31,16 @@
 						<text class="introWelcomeText">{{ intro.welcome }}</text>
 					</view>
 				</view>
-				<view class="msg" v-for="m in messages" :key="m.id" :class="m.role === 'user' ? 'user' : 'bot'">
-					<view class="bubble">
-						<text v-if="m.role === 'user'" class="bubbleText">{{ m.text }}</text>
+				<view class="msg" v-for="(m, mi) in messages" :key="mi" :class="m.role === 'user' ? 'user' : 'bot'">
+					<view class="bubble" v-if="m.text || m.file">
+						<view class="bubbleFile" v-if="m.file">
+							<image v-if="m.file.type === 'image'" :src="m.file.url" mode="widthFix" class="bubbleImg" @tap.stop="previewImage(m.file.url)"></image>
+							<view v-else class="bubbleOtherFile" @tap.stop="downloadFile(m.file.url)">
+								<text class="iconfont icon-lianjie fileIcon"></text>
+								<text class="fileName">{{ m.file.name || '点击下载文件' }}</text>
+							</view>
+						</view>
+						<text v-if="m.role === 'user' && m.text" class="bubbleText">{{ m.text }}</text>
 						<view v-else class="replyCard">
 							<view class="replyCardHead">
 								<view class="replyCardDot"></view>
@@ -44,24 +64,37 @@
 		</scroll-view>
 
 		<view class="composer" :style="{ bottom: footerBottom }">
-			<view class="composerInner">
-				<view class="leftBadge" :class="{ disabled: !sessionId }" @click="clearHistory()">
-					<text class="iconfont icon-shanchu31 leftIcon"></text>
-				</view>
-				<input class="input" v-model="draft" :adjust-position="true" confirm-type="send" placeholder="描述你的困扰或场景，我来帮你拆解" @confirm="send" />
-				<view class="send" :class="{ disabled: !draftTrim }" @click="send">
-					<text class="sendText">发送</text>
-				</view>
-			</view>
 			<view class="hintRow" v-if="!showIntro">
 				<view class="hintChip" v-for="(s, i) in suggestions" :key="i" @click="useSuggestion(s)">
 					<text class="hintChipText">{{ s }}</text>
 				</view>
 			</view>
-			<view class="aiDisclaimer">
-				<text class="aiDisclaimerText">本服务为AI生成内容，结果仅供参考。</text>
+			<view class="composerInner">
+				<view class="pendingFilePreview" v-if="pendingFile">
+					<image v-if="pendingFile.type === 'image'" :src="pendingFile.url" mode="aspectFill" class="previewImg"></image>
+					<view v-else class="previewFile">
+						<text class="iconfont icon-lianjie fileIcon"></text>
+						<text class="fileName">{{ pendingFile.name }}</text>
+					</view>
+					<view class="removeFile" @tap.stop="pendingFile = null">
+						<text class="iconfont icon-guanbi6 removeIcon"></text>
+					</view>
+				</view>
+				<view class="composerButtons">
+					<view class="leftBadge" :class="{ disabled: !sessionId }" @tap.stop="clearHistory()">
+						<text class="iconfont icon-shanchu31 leftIcon"></text>
+					</view>
+					<textarea class="ai-textarea" v-model="draft" :adjust-position="false" :cursor-spacing="0" :show-confirm-bar="false" :auto-height="true" placeholder="描述你的困扰或场景，我来帮你拆解" maxlength="-1" @focus="onComposerFocus" @blur="onComposerBlur" />
+					<view class="addBadge" @tap.stop="uploadFile">
+						<text class="iconfont icon-tianjia1 addIcon"></text>
+					</view>
+					<view class="send" :class="{ disabled: !draftTrim && !pendingFile }" @tap.stop="send">
+						<text class="iconfont icon-fasong sendIcon"></text>
+					</view>
+				</view>
 			</view>
-			<view class="safePad"></view>
+			
+			<!-- <view class="safePad"></view> -->
 		</view>
 	</view>
 </template>
@@ -83,7 +116,7 @@
 	} from '@/config/app.js'
 	import store from '@/store'
 	import { toLogin } from '@/libs/login.js'
-	import md from '@/utils/markdown.js'
+	import { markdownToHtml } from '@/utils/markdown.js'
 
 	function uid() {
 		return `${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -166,11 +199,19 @@
 				draft: '',
 				sending: false,
 				scrollTop: 0,
+				scrollTopSeed: 0,
+				composerHeightPx: 0,
 				messages: [],
 				suggestions: ['孩子顶嘴很严重', '写作业太拖拉', '情绪失控后怎么修复', '手机规则怎么立'],
 				requestTask: null,
 				perfStartAt: 0,
-				perfFirstByteAt: 0
+				perfFirstByteAt: 0,
+				pendingFile: null,
+				keyboardHeight: 0,
+				keyboardHandler: null,
+				sysHeight: '0px',
+				customNavEnabled: false,
+				customNavHeightPx: 0
 			}
 		},
 		computed: {
@@ -178,7 +219,17 @@
 				return {}
 			},
 			footerBottom() {
-				return '0rpx'
+				if (this.keyboardHeight > 0) return `${this.keyboardHeight}px`
+				return '0px'
+			},
+			chatBottom() {
+				const base = this.composerHeightPx > 0 ? this.composerHeightPx : this.rpxToPx(260)
+				const keyboard = this.keyboardHeight > 0 ? this.keyboardHeight : 0
+				return `${Math.max(0, base + keyboard)}px`
+			},
+			chatTop() {
+				if (!this.customNavEnabled) return '0px'
+				return `${Number(this.customNavHeightPx || 0)}px`
 			},
 			draftTrim() {
 				return (this.draft || '').trim()
@@ -189,6 +240,23 @@
 			const rawAgentId = opt.agentId || opt.agent_id || opt.id || opt.agentID || ''
 			this.agentId = rawAgentId !== '' ? rawAgentId : 'hyqz_default'
 			this.title = safeDecode(opt.title) || '慧圆'
+			let statusBar = 0
+			try {
+				const sys = uni.getSystemInfoSync()
+				statusBar = Number(sys && sys.statusBarHeight ? sys.statusBarHeight : 0) || 0
+				if (statusBar <= 0 && uni.getMenuButtonBoundingClientRect) {
+					const menuRect = uni.getMenuButtonBoundingClientRect()
+					statusBar = Number(menuRect && menuRect.top ? menuRect.top : 0) || 0
+				}
+			} catch (e) {
+				statusBar = 0
+			}
+			if (statusBar <= 0) statusBar = 20
+			this.sysHeight = `${statusBar}px`
+			// #ifdef MP || APP-PLUS
+			this.customNavEnabled = true
+			// #endif
+			this.customNavHeightPx = statusBar + 43
 			uni.setNavigationBarTitle({
 				title: this.title || '对话'
 			})
@@ -248,8 +316,16 @@
 				this.draft = prefill
 				this.send()
 			}
+			this.registerKeyboardListener()
+			this.$nextTick(() => {
+				this.measureComposerHeight()
+			})
 		},
 		onShow() {
+			this.registerKeyboardListener()
+			this.$nextTick(() => {
+				this.measureComposerHeight()
+			})
 			if (this.agentId && this.agentId !== 'hyqz_default') {
 				const stored = Number(uni.getStorageSync(sessionStorageKey(this.agentId)) || 0) || 0
 				if (stored && !this.sessionId) {
@@ -261,6 +337,8 @@
 			}
 		},
 		onHide() {
+			this.keyboardHeight = 0
+			this.unregisterKeyboardListener()
 			if (this.requestTask && this.requestTask.abort) {
 				try {
 					this.requestTask.abort()
@@ -268,6 +346,8 @@
 			}
 		},
 		onUnload() {
+			this.keyboardHeight = 0
+			this.unregisterKeyboardListener()
 			if (this.requestTask && this.requestTask.abort) {
 				try {
 					this.requestTask.abort()
@@ -275,6 +355,126 @@
 			}
 		},
 		methods: {
+			rpxToPx(v) {
+				if (typeof uni !== 'undefined' && typeof uni.upx2px === 'function') {
+					return Number(uni.upx2px(Number(v) || 0)) || 0
+				}
+				return Number(v) || 0
+			},
+			measureComposerHeight() {
+				if (typeof uni === 'undefined' || typeof uni.createSelectorQuery !== 'function') return
+				try {
+					uni.createSelectorQuery()
+						.in(this)
+						.select('.composer')
+						.boundingClientRect((rect) => {
+							const h = rect && rect.height ? Number(rect.height) : 0
+							if (h > 0) this.composerHeightPx = h
+						})
+						.exec()
+				} catch (e) {}
+			},
+			goBack() {
+				const pages = getCurrentPages()
+				if (pages && pages.length > 1) {
+					uni.navigateBack({
+						delta: 1
+					})
+					return
+				}
+				uni.switchTab({
+					url: '/pages/ai/index'
+				})
+			},
+			uploadFile() {
+				const that = this;
+				// #ifdef MP-WEIXIN
+				uni.chooseMessageFile({
+					count: 1,
+					type: 'all',
+					success: (res) => {
+						const file = res.tempFiles[0];
+						this.performUpload(file.path, file.name);
+					}
+				});
+				// #endif
+				// #ifndef MP-WEIXIN
+				uni.chooseImage({
+					count: 1,
+					sizeType: ['compressed'],
+					sourceType: ['album', 'camera'],
+					success: (res) => {
+						this.performUpload(res.tempFilePaths[0]);
+					}
+				});
+				// #endif
+			},
+			performUpload(filePath, fileName = '') {
+				const that = this;
+				uni.showLoading({ title: '上传中' });
+				
+				let fileType = 'file';
+				const ext = (fileName || filePath).split('.').pop().toLowerCase();
+				if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+					fileType = 'image';
+				} else if (['mp4', 'mov', 'm4v'].includes(ext)) {
+					fileType = 'video';
+				}
+
+				uni.uploadFile({
+					url: HTTP_REQUEST_URL + '/api/upload/image',
+					filePath: filePath,
+					name: 'file',
+					header: HEADER,
+					success: (res) => {
+						uni.hideLoading();
+						let data = res.data;
+						if (typeof data === 'string') {
+							try { data = JSON.parse(data); } catch (e) {}
+						}
+						if (data && (data.status === 200 || data.code === 200)) {
+							const url = data.data.url;
+							that.pendingFile = {
+								url: url,
+								name: fileName || url.split('/').pop(),
+								type: fileType,
+								ext: ext
+							};
+						} else {
+							uni.showToast({ title: (data && data.msg) || '上传失败', icon: 'none' });
+						}
+					},
+					fail: (err) => {
+						uni.hideLoading();
+						uni.showToast({ title: '上传异常', icon: 'none' });
+					}
+				});
+			},
+			previewImage(url) {
+				uni.previewImage({
+					urls: [url]
+				})
+			},
+			downloadFile(url) {
+				// #ifdef MP-WEIXIN
+				uni.downloadFile({
+					url: url,
+					success: (res) => {
+						if (res.statusCode === 200) {
+							uni.openDocument({
+								filePath: res.tempFilePath,
+								success: function (res) {
+									console.log('打开文档成功');
+								}
+							});
+						}
+					}
+				});
+				// #endif
+				// #ifndef MP-WEIXIN
+				window.open(url);
+				// #endif
+			},
 			persistSession() {
 				if (!this.agentId || this.agentId === 'hyqz_default') return
 				if (!this.sessionId) return
@@ -301,7 +501,7 @@
 							id: m.id,
 							role: m.role === 'user' ? 'user' : 'bot',
 							text: m.content,
-							html: m.role === 'user' ? '' : md.markdownToHtml(m.content)
+							html: m.role === 'user' ? '' : markdownToHtml(m.content)
 						}))
 						// Replace initial welcome message with history
 						this.messages = msgs
@@ -348,9 +548,49 @@
 			},
 			noop() {
 			},
+			registerKeyboardListener() {
+				if (typeof uni.onKeyboardHeightChange !== 'function') return
+				if (this.keyboardHandler) return
+				const handler = (res) => {
+					const h = Number((res && res.height) || 0) || 0
+					this.keyboardHeight = h
+					this.$nextTick(() => {
+						this.measureComposerHeight()
+					})
+					if (h > 0) this.scrollToBottom()
+				}
+				this.keyboardHandler = handler
+				try {
+					uni.onKeyboardHeightChange(handler)
+				} catch (e) {}
+			},
+			unregisterKeyboardListener() {
+				if (!this.keyboardHandler) return
+				if (typeof uni.offKeyboardHeightChange === 'function') {
+					try {
+						uni.offKeyboardHeightChange(this.keyboardHandler)
+					} catch (e) {}
+				}
+				this.keyboardHandler = null
+			},
 			useSuggestion(s) {
 				this.draft = s
 				this.send()
+			},
+			onComposerFocus() {
+				this.scrollToBottom()
+				setTimeout(() => {
+					this.scrollToBottom()
+				}, 120)
+				this.$nextTick(() => {
+					this.measureComposerHeight()
+				})
+			},
+			onComposerBlur() {
+				this.keyboardHeight = 0
+				this.$nextTick(() => {
+					this.measureComposerHeight()
+				})
 			},
 			goAgents() {
 				uni.navigateTo({
@@ -359,20 +599,24 @@
 			},
 			scrollToBottom() {
 				this.$nextTick(() => {
-					this.scrollTop = 999999
+					this.scrollTopSeed += 1
+					this.scrollTop = 900000 + this.scrollTopSeed
 				})
 			},
 			send() {
-				if (!this.draftTrim || this.sending) return
+				if ((!this.draftTrim && !this.pendingFile) || this.sending) return
 				const text = this.draftTrim
+				const file = this.pendingFile
 				this.draft = ''
+				this.pendingFile = null
 				this.showIntro = false
 				this.perfStartAt = Date.now()
 				this.perfFirstByteAt = 0
 				this.messages.push({
 					id: uid(),
 					role: 'user',
-					text
+					text,
+					file: file
 				})
 				this.sending = true
 				this.scrollToBottom()
@@ -398,7 +642,7 @@
 
 				if (!token) {
 					this.messages[botMsgIndex].text = '请先登录'
-					this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+					this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 					this.sending = false
 					this.scrollToBottom()
 					return
@@ -406,10 +650,16 @@
 
 				if (!this.agentId || this.agentId === 'hyqz_default') {
 					this.messages[botMsgIndex].text = '请先选择一个智能体'
-					this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+					this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 					this.sending = false
 					this.scrollToBottom()
 					return
+				}
+
+				// Construct the message content to send to API
+				let apiMessage = text
+				if (file && file.url) {
+					apiMessage = text ? `${text}\n[文件: ${file.url}]` : `[文件: ${file.url}]`
 				}
 
 				const handleLine = (rawLine) => {
@@ -431,10 +681,10 @@
 							if (data.content) {
 								if (!this.perfFirstByteAt) this.perfFirstByteAt = Date.now()
 								this.messages[botMsgIndex].text += data.content
-								this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+								this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 								this.scrollToBottom()
 							}
-							if (data.blocks && Array.isArray(data.blocks) && data.blocks.length) {
+							if (data.blocks && Array.isArray(data.blocks) && data.blocks.length && !String(this.messages[botMsgIndex].text || '').trim()) {
 								this.messages[botMsgIndex].blocks = data.blocks
 								this.scrollToBottom()
 								const endAt = Date.now()
@@ -448,7 +698,7 @@
 							}
 							if (data.error) {
 								this.messages[botMsgIndex].text = data.error
-								this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+								this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 								this.scrollToBottom()
 								if (String(data.error || '').includes('充值')) {
 									uni.showModal({
@@ -469,7 +719,7 @@
 						} catch (e) {
 							if (dataStr) {
 								this.messages[botMsgIndex].text += dataStr
-								this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+								this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 								this.scrollToBottom()
 							}
 						}
@@ -482,7 +732,7 @@
 							const msg = data.msg || data.error || data.message
 							if (msg) {
 								this.messages[botMsgIndex].text = msg
-								this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+								this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 								this.sending = false
 								this.scrollToBottom()
 								if (data && data.data && data.data.need_recharge) {
@@ -526,7 +776,7 @@
 					body: JSON.stringify({
 						agent_id: this.agentId,
 						session_id: this.sessionId,
-						message: text,
+						message: apiMessage,
 						stream: true
 					})
 				}).then(response => {
@@ -550,7 +800,7 @@
 					read()
 				}).catch(err => {
 					this.messages[botMsgIndex].text = '发送失败'
-					this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+					this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 					this.sending = false
 				})
 				// #endif
@@ -573,14 +823,14 @@
 						if (d && d.session_id) this.sessionId = Number(d.session_id) || this.sessionId
 						if (reply) {
 							this.messages[botMsgIndex].text = reply
-							this.messages[botMsgIndex].html = md.markdownToHtml(reply)
+							this.messages[botMsgIndex].html = markdownToHtml(reply)
 						}
 						return
 					}
 					const msg = payload && typeof payload === 'object' ? (payload.msg || payload.error || payload.message) : ''
 					if (msg) {
 						this.messages[botMsgIndex].text = String(msg)
-						this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+						this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 					}
 				}
 
@@ -589,7 +839,7 @@
 					processChunk('', true)
 					if (!this.messages[botMsgIndex].text) {
 						this.messages[botMsgIndex].text = '未收到回复，请检查小程序请求域名、网络或服务日志'
-						this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+						this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 					}
 					this.sending = false
 					this.persistSession()
@@ -601,12 +851,13 @@
 						url: HTTP_REQUEST_URL + '/api/ai/chat',
 						method: 'POST',
 						header: header,
+						timeout: 120000,
 						data: {
 							agent_id: this.agentId,
 							session_id: this.sessionId,
-							message: text,
+							message: apiMessage,
 							stream: useStream ? true : false,
-							format: 'blocks'
+							format: 'text'
 						},
 						enableChunked: useStream ? true : undefined,
 						responseType: useStream ? 'text' : undefined,
@@ -635,7 +886,7 @@
 								return
 							}
 							this.messages[botMsgIndex].text = '发送失败: ' + (err && err.errMsg ? err.errMsg : '网络错误')
-							this.messages[botMsgIndex].html = md.markdownToHtml(this.messages[botMsgIndex].text)
+							this.messages[botMsgIndex].html = markdownToHtml(this.messages[botMsgIndex].text)
 						},
 						complete: () => {
 							if (useStream && retried) return
@@ -666,7 +917,50 @@
 <style lang="scss" scoped>
 	.page {
 		min-height: 100vh;
-		background: #f4f6f8;
+		background: linear-gradient(180deg, rgba(241, 165, 92, 0.52) 0%, rgba(249, 233, 200, 0.96) 62%, #fff7ef 100%);
+	}
+
+	.sys-head {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 20;
+		background: #fff3e6;
+		box-shadow: 0 10rpx 24rpx rgba(31, 35, 41, 0.10);
+		.bg {
+			display: none;
+		}
+	}
+
+	.sys-nav {
+		height: 43px;
+		display: flex;
+		align-items: center;
+	}
+
+	.sys-back,
+	.sys-side {
+		width: 88rpx;
+		height: 43px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+	}
+
+	.sys-back .iconfont {
+		font-size: 34rpx;
+		color: #111827;
+	}
+
+	.sys-title {
+		flex: 1;
+		text-align: center;
+		line-height: 43px;
+		font-size: 36rpx;
+		color: #333;
+		font-weight: 600;
 	}
 	
 	.chat {
@@ -678,7 +972,7 @@
 	}
 
 	.chatInner {
-		padding: 18rpx 24rpx 360rpx;
+		padding: 18rpx 24rpx 24rpx;
 	}
 	
 	.intro {
@@ -692,7 +986,7 @@
 	.introTop {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: flex-end;
 	}
 	
 	.introAvatar {
@@ -717,8 +1011,8 @@
 	
 	.introSub {
 		margin-top: 10rpx;
-		font-size: 24rpx;
-		line-height: 36rpx;
+		font-size: 30rpx;
+		line-height: 44rpx;
 		color: rgba(31, 35, 41, 0.62);
 		text-align: center;
 	}
@@ -738,8 +1032,8 @@
 	}
 	
 	.introQText {
-		font-size: 26rpx;
-		line-height: 38rpx;
+		font-size: 30rpx;
+		line-height: 44rpx;
 		color: rgba(31, 35, 41, 0.92);
 	}
 	
@@ -749,8 +1043,8 @@
 	}
 	
 	.introWelcomeText {
-		font-size: 24rpx;
-		line-height: 36rpx;
+		font-size: 28rpx;
+		line-height: 44rpx;
 		color: rgba(31, 35, 41, 0.65);
 	}
 
@@ -773,11 +1067,59 @@
 		padding: 18rpx 18rpx;
 		border-radius: 18rpx;
 		box-shadow: 0rpx 10rpx 30rpx rgba(0, 0, 0, 0.06);
+		display: flex;
+		flex-direction: column;
+		gap: 12rpx;
+	}
+
+	.bubbleFile {
+		width: 100%;
+		border-radius: 12rpx;
+		overflow: hidden;
+	}
+
+	.bubbleImg {
+		width: 100%;
+		max-width: 500rpx;
+		display: block;
+		border-radius: 12rpx;
+	}
+
+	.bubbleOtherFile {
+		display: flex;
+		align-items: center;
+		padding: 20rpx;
+		background: #f5f6f7;
+		border-radius: 12rpx;
+		gap: 16rpx;
+		width: 400rpx;
+	}
+
+	.bubbleOtherFile .fileIcon {
+		font-size: 40rpx;
+		color: #646a73;
+	}
+
+	.bubbleOtherFile .fileName {
+		font-size: 26rpx;
+		color: #1f2329;
+		flex: 1;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.msg.user .bubbleOtherFile {
+		background: rgba(255, 255, 255, 0.15);
+	}
+
+	.msg.user .bubbleOtherFile .fileIcon,
+	.msg.user .bubbleOtherFile .fileName {
+		color: #fff;
 	}
 
 	.msg.user .bubble {
-		background: rgba(241, 165, 92, 0.24);
-		border: 1rpx solid rgba(241, 165, 92, 0.18);
+		background: #da7e28;
 		border-top-right-radius: 6rpx;
 	}
 
@@ -817,8 +1159,8 @@
 	}
 
 	.replyCardTitle {
-		font-size: 22rpx;
-		line-height: 30rpx;
+		font-size: 28rpx;
+		line-height: 36rpx;
 		font-weight: 700;
 		color: rgba(31, 35, 41, 0.72);
 	}
@@ -828,37 +1170,45 @@
 	}
 
 	.bubbleText {
-		font-size: 26rpx;
-		line-height: 38rpx;
+		font-size: 32rpx;
+		line-height: 48rpx;
 		color: #1f2329;
 	}
 
+	.bubbleAiTag {
+		margin-top: 8rpx;
+		align-self: flex-end;
+		font-size: 24rpx;
+		line-height: 28rpx;
+		color: rgba(31, 35, 41, 0.45);
+	}
+
 	.msg.user .bubbleText {
-		color: rgba(31, 35, 41, 0.92);
+		color: rgba(255, 255, 255, 0.96);
 	}
 
 	.fmt {
-		font-size: 26rpx;
-		line-height: 38rpx;
+		font-size: 32rpx;
+		line-height: 48rpx;
 		color: #1f2329;
 		word-break: break-word;
 		::v-deep p {
 			margin: 0 0 10rpx 0;
 		}
 		::v-deep h1 {
-			font-size: 34rpx;
+			font-size: 38rpx;
 			line-height: 48rpx;
 			font-weight: 800;
 			margin: 8rpx 0 12rpx 0;
 		}
 		::v-deep h2 {
-			font-size: 32rpx;
+			font-size: 36rpx;
 			line-height: 46rpx;
 			font-weight: 800;
 			margin: 8rpx 0 12rpx 0;
 		}
 		::v-deep h3 {
-			font-size: 30rpx;
+			font-size: 34rpx;
 			line-height: 44rpx;
 			font-weight: 800;
 			margin: 8rpx 0 10rpx 0;
@@ -916,13 +1266,13 @@
 			padding: 2rpx 8rpx;
 			border-radius: 8rpx;
 			background: #f6f7f8;
-			font-size: 24rpx;
+			font-size: 26rpx;
 			font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 		}
 		::v-deep pre code {
 			padding: 0;
 			background: transparent;
-			font-size: 24rpx;
+			font-size: 26rpx;
 		}
 	}
 
@@ -976,28 +1326,135 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(255, 255, 255, 0.92);
-		backdrop-filter: blur(10px);
-		border-top: 1rpx solid rgba(0, 0, 0, 0.06);
-		padding: 14rpx 18rpx 0;
+		padding: 16rpx 18rpx 16rpx;
+		background: #fff;
+		box-shadow: 0rpx -5rpx 20rpx rgba(31, 35, 41, 0.10);
+		z-index: 9999;
+		pointer-events: auto;
 	}
 
 	.composerInner {
 		display: flex;
-		align-items: center;
-		gap: 12rpx;
+		flex-direction: column;
+		background: transparent;
+		border-radius: 24rpx;
+		border: none;
+		overflow: visible;
+		box-shadow: none;
+		pointer-events: auto;
 	}
 
-	.leftBadge {
-		width: 84rpx;
-		height: 84rpx;
-		border-radius: 18rpx;
-		background: rgba(241, 165, 92, 0.12);
-		border: 1rpx solid rgba(241, 165, 92, 0.20);
+	.pendingFilePreview {
+		position: relative;
+		padding: 24rpx 24rpx 0;
+		display: flex;
+		align-items: center;
+		z-index: 10;
+		pointer-events: auto;
+	}
+
+	.previewImg {
+		width: 140rpx;
+		height: 140rpx;
+		border-radius: 12rpx;
+		border: 1rpx solid rgba(0, 0, 0, 0.05);
+	}
+
+	.previewFile {
+		width: 140rpx;
+		height: 140rpx;
+		background: #f5f6f7;
+		border-radius: 12rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 10rpx;
+		box-sizing: border-box;
+		gap: 4rpx;
+		pointer-events: auto;
+	}
+
+	.previewFile .fileIcon {
+		font-size: 40rpx;
+		color: #646a73;
+		pointer-events: none;
+	}
+
+	.previewFile .fileName {
+		font-size: 20rpx;
+		color: #646a73;
+		width: 100%;
+		text-align: center;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		pointer-events: none;
+	}
+
+	.removeFile {
+		position: absolute;
+		top: 14rpx;
+		left: 144rpx;
+		width: 44rpx; /* 调大一点 */
+		height: 44rpx;
+		background: rgba(0, 0, 0, 0.5);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 11;
+		pointer-events: auto;
+	}
+
+	.removeIcon {
+		color: #fff;
+		font-size: 24rpx;
+		pointer-events: none;
+	}
+
+	.composerButtons {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 2rpx;
+		padding: 8rpx 15rpx 12rpx;
+		z-index: 10;
+		pointer-events: auto;
+	}
+
+	.addBadge {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 12rpx;
+		background: transparent;
+		border: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex: none;
+		pointer-events: auto;
+		align-self: center;
+	}
+
+	.addIcon {
+		font-size: 54rpx;
+		color: #e98f36;
+		pointer-events: none;
+	}
+
+	.leftBadge {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 12rpx;
+		background: transparent;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+		pointer-events: auto;
+		align-self: center;
 	}
 
 	.leftBadge.disabled {
@@ -1005,42 +1462,58 @@
 	}
 
 	.leftIcon {
-		font-size: 34rpx;
-		color: rgba(241, 165, 92, 0.92);
+		font-size: 54rpx;
+		color: #e98f36;
+		pointer-events: none;
 	}
-
-	.input {
-		flex: 1;
-		height: 84rpx;
-		padding: 0 18rpx;
-		border-radius: 18rpx;
-		background: #f3f4f6;
-		font-size: 26rpx;
+	.ai-textarea {
+		flex: 0.92;
+		min-width: 0;
+		min-height: 90rpx;
+		max-height: 150rpx;
+		padding: 14rpx 18rpx;
+		background: #f5f6f7;
+		border: 1rpx solid rgba(31, 35, 41, 0.12);
+		border-radius: 12rpx;
+		font-size: 32rpx;
 		color: #1f2329;
+		line-height: 1.4;
+		box-sizing: border-box;
+		word-break: break-all;
+		white-space: pre-wrap;
 	}
 
 	.send {
-		height: 84rpx;
-		padding: 0 18rpx;
-		border-radius: 18rpx;
-		background: linear-gradient(135deg, var(--view-main-start) 0%, var(--view-main-over) 100%);
+		height: 56rpx;
+		width: 56rpx;
+		padding: 0;
+		border-radius: 12rpx;
+		background: transparent;
+		border: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex: none;
+		align-self: center;
 	}
 
 	.send.disabled {
-		opacity: 0.5;
+		background: transparent;
+		opacity: 0.35;
 	}
 
-	.sendText {
-		font-size: 26rpx;
-		font-weight: 900;
-		color: #fff;
+	.sendIcon {
+		font-size: 54rpx;
+		color: #e98f36;
+		pointer-events: none;
+	}
+
+	.send.disabled .sendIcon {
+		color: #e98f36;
 	}
 
 	.hintRow {
-		margin-top: 12rpx;
+		// margin-top: 12rpx;
 		display: flex;
 		gap: 12rpx;
 		overflow-x: auto;
@@ -1050,28 +1523,22 @@
 
 	.hintChip {
 		flex: none;
-		padding: 12rpx 16rpx;
+		padding: 14rpx 18rpx;
 		border-radius: 999rpx;
 		background: rgba(241, 165, 92, 0.08);
 		border: 1rpx solid rgba(241, 165, 92, 0.16);
 	}
 
 	.hintChipText {
-		font-size: 24rpx;
+		font-size: 28rpx;
+		line-height: 36rpx;
+		font-weight: 700;
 		color: #a95608;
 	}
 	
-	.aiDisclaimer {
-		padding-bottom: 12rpx;
-	}
-	
-	.aiDisclaimerText {
-		font-size: 22rpx;
-		line-height: 32rpx;
-		color: rgba(31, 35, 41, 0.45);
-	}
-
 	.safePad {
 		height: env(safe-area-inset-bottom);
+		pointer-events: none;
+		background-color: white;
 	}
 </style>
